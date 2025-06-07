@@ -54,7 +54,7 @@ public ref struct SpanList<T>
     /// <summary>
     /// True if the list is in its default state or empty (no valid elements).
     /// </summary>
-    public readonly bool IsDefaultOrEmpty => _span.IsEmpty && _count == 0;
+    public readonly bool IsDefaultOrEmpty => IsDefault || IsEmpty;
 
     /// <summary>
     /// Returns a reference to the element at <paramref name="index"/>.
