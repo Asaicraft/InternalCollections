@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InternalCollections.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InternalCollections.Core", "InternalCollections.Core\InternalCollections.Core.csproj", "{A1C41C39-5AB0-4F5E-822D-7645ACA685ED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InternalCollections.Benchmarks", "InternalCollections.Benchmarks\InternalCollections.Benchmarks.csproj", "{92FA010D-21C2-43E9-9709-3AC091C0ECEC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{A1C41C39-5AB0-4F5E-822D-7645ACA685ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1C41C39-5AB0-4F5E-822D-7645ACA685ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1C41C39-5AB0-4F5E-822D-7645ACA685ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92FA010D-21C2-43E9-9709-3AC091C0ECEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92FA010D-21C2-43E9-9709-3AC091C0ECEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92FA010D-21C2-43E9-9709-3AC091C0ECEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92FA010D-21C2-43E9-9709-3AC091C0ECEC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
