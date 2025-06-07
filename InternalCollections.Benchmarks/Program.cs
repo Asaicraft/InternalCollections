@@ -3,6 +3,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using InternalCollections;
 using InternalCollections.Benchmarks;
+using System.Runtime.InteropServices;
 
 BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly)
                  .Run(args);
@@ -139,7 +140,7 @@ public class SpanListBenchmark
     [Benchmark]
     public int SpanListAddAndIterate()
     {
-        Span<int> buffer = stackalloc int[32];
+        Span<int> buffer = stackalloc int[Count];
         var spanList = new SpanList<int>(buffer[..Count]);
 
         for (var index = 0; index < Count; index++)
@@ -148,7 +149,7 @@ public class SpanListBenchmark
         }
 
         var sum = 0;
-        foreach (ref readonly var value in spanList.AsReadOnlySpan())
+        foreach (ref readonly var value in spanList)
         {
             sum += value;
         }
@@ -208,28 +209,23 @@ public class TinyDictionaryBenchmark
 [Config(typeof(ColdVsHotConfig))]
 public class RefSpanBenchmark
 {
-    [Params(4, 8)]
+    [Params(4, 8, 256)]
     public int Count;
 
-    private Payload[] _payloadArray = null!;
-
-    [GlobalSetup]
-    public void Setup()
-    {
-        _payloadArray = new Payload[Count];
-        for (var index = 0; index < Count; index++)
-        {
-            _payloadArray[index] = new Payload { Value = index };
-        }
-    }
 
     [Benchmark(Baseline = true)]
     public int ReadPlainArray()
     {
+        var payloadArray = new Payload[Count];
+        for (var index = 0; index < Count; index++)
+        {
+            payloadArray[index] = new Payload { Value = index };
+        }
+
         var sum = 0;
         for (var index = 0; index < Count; index++)
         {
-            sum += _payloadArray[index].Value;
+            sum += payloadArray[index].Value;
         }
 
         return sum;
@@ -238,12 +234,12 @@ public class RefSpanBenchmark
     [Benchmark]
     public int ReadRefSpan()
     {
-        Span<IntPtr> handles = stackalloc IntPtr[32];
-        using var referenceSpan = new RefSpan<Payload>(handles[..Count]);
+        Span<GCHandle> handles = stackalloc GCHandle[Count];
+        using var referenceSpan = new RefSpan<Payload>(handles);
 
         for (var index = 0; index < Count; index++)
         {
-            referenceSpan[index] = _payloadArray[index];
+            referenceSpan[index] = new Payload { Value = index };
         }
 
         var sum = 0;

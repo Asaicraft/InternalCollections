@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,7 +11,7 @@ public sealed class RefSpanTests
     [Fact]
     public void SetGet_And_SetNull_WorkCorrectly()
     {
-        Span<IntPtr> buffer = stackalloc IntPtr[2];
+        Span<GCHandle> buffer = stackalloc GCHandle[2];
         using var span = new RefSpan<string>(buffer);
 
         Assert.Null(span[0]);
@@ -26,7 +27,7 @@ public sealed class RefSpanTests
     [Fact]
     public void Dispose_Frees_All_Handles()
     {
-        Span<IntPtr> buffer = stackalloc IntPtr[3];
+        Span<GCHandle> buffer = stackalloc GCHandle[3];
         var span = new RefSpan<object>(buffer);
 
         span[0] = new object();

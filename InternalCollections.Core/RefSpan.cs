@@ -8,22 +8,22 @@ using System.Text;
 namespace InternalCollections;
 
 /// <summary>
-/// A span-like structure for storing reference-type objects within a <c>stackalloc</c>
-/// buffer (<see cref="Span{IntPtr}"/>), where each element is a <see cref="GCHandle"/> address.
+/// A span-like structure for storing reference-type objects using a <see cref="Span{GCHandle}"/>.
+/// Each element is a <see cref="GCHandle"/> that may point to a pinned or tracked managed object.
 /// Suitable for scenarios where multiple objects need to be temporarily pinned in
 /// a short-lived stack buffer without managed heap allocations.
 /// </summary>
 /// <typeparam name="T">The reference type of the stored objects.</typeparam>
 public readonly ref struct RefSpan<T> where T : class
 {
-    private readonly Span<IntPtr> _handles;
+    private readonly Span<GCHandle> _handles;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RefSpan{T}"/> struct
-    /// with the specified span of GCHandle pointers.
+    /// using the specified span of <see cref="GCHandle"/> entries.
     /// </summary>
-    /// <param name="gcHandlePointers">A span of <see cref="IntPtr"/> representing GCHandle addresses.</param>
-    public RefSpan(Span<IntPtr> gcHandlePointers)
+    /// <param name="gcHandlePointers">The span that will store <see cref="GCHandle"/>s for managed objects.</param>
+    public RefSpan(Span<GCHandle> gcHandlePointers)
     {
         _handles = gcHandlePointers;
     }
@@ -35,51 +35,65 @@ public readonly ref struct RefSpan<T> where T : class
 
     /// <summary>
     /// Gets or sets the object at the specified index.
+    /// On get, returns <c>null</c> if the handle is not allocated.
+    /// On set, frees any previously allocated handle and stores a new one if <paramref name="value"/> is not <c>null</c>.
     /// </summary>
-    /// <param name="index">The index of the element to get or set.</param>
-    /// <returns>The managed object of type <typeparamref name="T"/> at the specified index, or <c>null</c> if the handle is <see cref="IntPtr.Zero"/>.</returns>
-    public T? this[int index]
+    /// <param name="index">The index of the element to access.</param>
+    /// <returns>The managed object of type <typeparamref name="T"/>, or <c>null</c> if unassigned.</returns>
+    public readonly T? this[int index]
     {
         get
         {
-            if (_handles[index] == IntPtr.Zero)
-            {
-                return null;
-            }
+            var handle = _handles[index];
 
-            var handle = GCHandle.FromIntPtr(_handles[index]);
+            var boxed = handle.IsAllocated 
+                ? handle.Target
+                : null;
 
-            var boxed = handle.Target;
-
-            return Unsafe.As<object, T>(ref boxed);
+            return Unsafe.As<object?, T>(ref boxed);
         }
         set
         {
-            if (_handles[index] != IntPtr.Zero)
+            var oldHandle = _handles[index];
+
+            if(oldHandle.IsAllocated)
             {
-                var oldHandle = GCHandle.FromIntPtr(_handles[index]);
+                var boxed = oldHandle.Target;
+
+                if (ReferenceEquals(value, boxed))
+                {
+                    return;
+                }
+
                 oldHandle.Free();
             }
 
-            _handles[index] = value is null
-                ? IntPtr.Zero
-                : GCHandle.ToIntPtr(GCHandle.Alloc(value, GCHandleType.Normal));
+            if (value is null)
+            {
+                _handles[index] = default;
+            }
+            else
+            {
+                var newHandle = GCHandle.Alloc(value, GCHandleType.Normal);
+                _handles[index] = newHandle;
+            }
         }
     }
 
     /// <summary>
-    /// Releases all <see cref="GCHandle"/> instances held by this span
-    /// and resets each handle to <see cref="IntPtr.Zero"/>.
+    /// Releases all allocated <see cref="GCHandle"/> instances in the span
+    /// and resets the corresponding entries to their default state.
     /// </summary>
-    public void Dispose()
+    public readonly void Dispose()
     {
         for (var i = 0; i < _handles.Length; i++)
         {
-            if (_handles[i] != IntPtr.Zero)
+            var handle = _handles[i];
+            if (handle.IsAllocated)
             {
-                GCHandle.FromIntPtr(_handles[i]).Free();
-                _handles[i] = IntPtr.Zero;
+                handle.Free();
             }
+            _handles[i] = default; 
         }
     }
 
