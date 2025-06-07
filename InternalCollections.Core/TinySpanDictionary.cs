@@ -275,6 +275,8 @@ public ref struct TinySpanDictionary<TKey, TValue>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _span[_index].Key;
         }
+
+        public readonly KeyEnumerator GetEnumerator() => this;
     }
 
     [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
@@ -310,6 +312,8 @@ public ref struct TinySpanDictionary<TKey, TValue>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _span[_index].Value;
         }
+
+        public readonly ValueEnumerator GetEnumerator() => this;
     }
 
 
