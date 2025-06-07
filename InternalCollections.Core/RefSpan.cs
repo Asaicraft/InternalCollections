@@ -44,9 +44,9 @@ public readonly ref struct RefSpan<T> where T : class
     {
         get
         {
-            var handle = _handles[index];
+            ref var handle = ref _handles[index];
 
-            var boxed = handle.IsAllocated 
+            var boxed = handle.IsAllocated
                 ? handle.Target
                 : null;
 
@@ -54,28 +54,26 @@ public readonly ref struct RefSpan<T> where T : class
         }
         set
         {
-            var oldHandle = _handles[index];
-
-            if(oldHandle.IsAllocated)
-            {
-                var boxed = oldHandle.Target;
-
-                if (ReferenceEquals(value, boxed))
-                {
-                    return;
-                }
-
-                oldHandle.Free();
-            }
+            ref var handle = ref _handles[index];
 
             if (value is null)
             {
-                _handles[index] = default;
+                if (handle.IsAllocated)
+                {
+                    handle.Free();
+                }
+
+                handle = default;
+                return;
+            }
+
+            if (handle.IsAllocated)
+            {
+                handle.Target = value;
             }
             else
             {
-                var newHandle = GCHandle.Alloc(value, GCHandleType.Normal);
-                _handles[index] = newHandle;
+                handle = GCHandle.Alloc(value, GCHandleType.Normal);
             }
         }
     }
@@ -93,7 +91,7 @@ public readonly ref struct RefSpan<T> where T : class
             {
                 handle.Free();
             }
-            _handles[i] = default; 
+            _handles[i] = default;
         }
     }
 
