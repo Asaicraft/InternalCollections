@@ -10,7 +10,7 @@ namespace InternalCollections;
 /// <summary>
 /// A tiny dictionary backed by a <see cref="Span{T}"/> of
 /// <see cref="KeyValuePair{TKey,TValue}"/>. Capacity is fixed, no reallocations.
-/// Suitable for very small, short-lived maps on the stack (≈ &lt; 16 keys).
+/// Suitable for very small, short-lived maps on the stack (≈ &lt; 8 keys).
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the dictionary.</typeparam>
 /// <typeparam name="TValue">The type of values in the dictionary.</typeparam>
