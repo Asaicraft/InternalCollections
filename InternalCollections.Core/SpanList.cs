@@ -86,6 +86,26 @@ public ref struct SpanList<T>
     }
 
     /// <summary>
+    /// Inserts an item at the specified <paramref name="index"/> and shifts existing items to the right.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Insert(int index, in T item)
+    {
+        Guard.IsInRange(index, 0, _count + 1, nameof(index));
+
+        Guard.IsLessThan(_count, _span.Length, "SpanList capacity exceeded.");
+
+        if (index < _count)
+        {
+            _span[index.._count]
+                 .CopyTo(_span[(index + 1)..]);
+        }
+
+        _span[index] = item;
+        _count++;
+    }
+
+    /// <summary>
     /// Adds a range of items from <paramref name="source"/>.
     /// Throws if the source range does not fit.
     /// </summary>
@@ -137,7 +157,7 @@ public ref struct SpanList<T>
     public readonly List<T> ToList()
     {
         var list = new List<T>(Capacity);
-        
+
         for (var i = 0; i < _count; i++)
         {
             list.Add(_span[i]);

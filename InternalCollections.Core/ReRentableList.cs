@@ -31,6 +31,44 @@ public ref struct ReRentableList<T>
         _list = CollectionPool.RentList<T>(capacity);
     }
 
+    public void ReRent(int capacity)
+    {
+        if (capacity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+        }
+
+        if (_list != null && _list.Capacity >= capacity)
+        {
+            return;
+        }
+
+        var newList = CollectionPool.RentList<T>(capacity);
+
+        if (_list != null)
+        {
+            newList.AddRange(_list);
+            CollectionPool.ReturnList(_list);
+        }
+
+        _list = newList;
+    }
+
+    /// <summary>
+    /// Checks if the list is empty.
+    /// </summary>
+    public readonly bool IsEmpty => Count == 0;
+
+    /// <summary>
+    /// Checks if the list is in its default state (not initialized).
+    /// </summary>
+    public readonly bool IsDefault => _list == null;
+
+    /// <summary>
+    /// Checks if the list is either default or empty.
+    /// </summary>
+    public readonly bool IsDefaultOrEmpty => _list == null || _list.Count == 0;
+
     /// <summary>
     /// Gets or sets the element at the specified index.
     /// </summary>
@@ -45,12 +83,12 @@ public ref struct ReRentableList<T>
     /// <summary>
     /// Gets the capacity of the underlying list.
     /// </summary>
-    public readonly int Capacity => _list.Capacity;
+    public readonly int Capacity => _list?.Capacity ?? 0;
 
     /// <summary>
     /// Gets the number of elements contained in the list.
     /// </summary>
-    public readonly int Count => _list.Count;
+    public readonly int Count => _list?.Count ?? 0;
 
     /// <summary>
     /// Adds an item to the list. Automatically grows the backing storage if needed.
@@ -60,6 +98,21 @@ public ref struct ReRentableList<T>
     {
         TryGrow();
         _list.Add(item);
+    }
+
+    /// <summary>
+    /// Adds a range of items to the list. Automatically grows the backing storage if needed.
+    /// </summary>
+    public void AddRange(ReadOnlySpan<T> items)
+    {
+        if (items.IsEmpty)
+        {
+            return; 
+        }
+
+        TryGrow(items.Length);
+
+        _list.AddRange(items.ToArray()); 
     }
 
     /// <summary>
@@ -178,19 +231,13 @@ public ref struct ReRentableList<T>
     /// Rents a larger list from the pool and replaces the current one.
     /// Used when the current list has reached its capacity.
     /// </summary>
-    private void TryGrow()
+    private void TryGrow(int additionalCount = 1)
     {
-        if (_list.Count != _list.Capacity)
+        if (_list.Count + additionalCount - 1 < _list.Capacity)
         {
             return; // No need to grow if we are not at capacity
         }
 
-        var newList = CollectionPool.RentList<T>(_list.Capacity * 2);
-
-        newList.AddRange(_list);
-
-        CollectionPool.ReturnList(_list);
-
-        _list = newList;
+        ReRent(_list.Capacity * 2);
     }
 }

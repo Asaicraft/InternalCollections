@@ -173,4 +173,40 @@ public sealed class SpanListTests
             list.AddRange([1, 2, 3, 4]);
         });
     }
+
+    [Fact]
+    public void Insert_Shifts_Items_Correctly()
+    {
+        Span<int> buffer = stackalloc int[4];
+        var list = new SpanList<int>(buffer);
+
+        list.Add(1);
+        list.Add(3);
+        list.Add(4);
+
+        list.Insert(1, 2);
+
+        Assert.Equal(4, list.Count);
+        Assert.Equal([1, 2, 3, 4], list.AsReadOnlySpan().ToArray());
+
+        list.Clear();
+        list.AddRange([2, 3]);
+        list.Insert(0, 1);
+        Assert.Equal([1, 2, 3], list.AsReadOnlySpan().ToArray());
+
+        list.Insert(list.Count, 4);
+        Assert.Equal([1, 2, 3, 4], list.AsReadOnlySpan().ToArray());
+    }
+
+    [Fact]
+    public void Insert_WhenFull_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+        {
+            Span<int> buffer = stackalloc int[2];
+            var list = new SpanList<int>(buffer);
+            list.AddRange([10, 20]); 
+            list.Insert(1, 15);
+        });
+    }
 }
