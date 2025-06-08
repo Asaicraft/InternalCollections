@@ -80,7 +80,7 @@ public class InvariantArrayBenchmark
         {
             var payload = new Payload { Value = index };
             _invariantArray[index] = payload;
-            _rawArray[index]= payload;
+            _rawArray[index] = payload;
         }
     }
 
@@ -232,10 +232,10 @@ public class RefSpanBenchmark
     }
 
     [Benchmark]
-    public int ReadRefSpan()
+    public unsafe int ReadRefSpan()
     {
-        Span<GCHandle> handles = stackalloc GCHandle[Count];
-        using var referenceSpan = new RefSpan<Payload>(handles);
+        var handles = stackalloc GCHandle[Count];
+        using var referenceSpan = new RefSpan<Payload>(handles, Count);
 
         for (var index = 0; index < Count; index++)
         {
@@ -250,4 +250,5 @@ public class RefSpanBenchmark
 
         return sum;
     }
+
 }
