@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>InternalCollections</RootNamespace>
+    <InternalVisibileTo>InternalCollections.Tests</InternalVisibileTo>
   </PropertyGroup>
 
   <ItemGroup>

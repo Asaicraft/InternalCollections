@@ -13,5 +13,5 @@ internal abstract class AbstractListPool<T>: AbstractCollectionPool<List<T>>
     /// <summary>
     /// Gets the default pooling implementation for <see cref="List{T}"/>.
     /// </summary>
-    public static readonly DefaultListPool<T> Default = new();
+    public static readonly OrderedListPool<T> Default = new();
 }
