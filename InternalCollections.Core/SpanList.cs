@@ -124,6 +124,28 @@ public ref struct SpanList<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly Enumerator GetEnumerator() => new(_span, _count);
 
+    /// <summary>
+    /// Converts the contents of the list to a new array.
+    /// </summary>
+    /// <returns>A new array containing the elements of the list.</returns>
+    public readonly T[] ToArray() => AsReadOnlySpan().ToArray();
+
+    /// <summary>
+    /// Converts the contents of the list to a new <see cref="List{T}"/>.
+    /// </summary>
+    /// <returns>A new <see cref="List{T}"/> containing the elements of the list.</returns>
+    public readonly List<T> ToList()
+    {
+        var list = new List<T>(Capacity);
+        
+        for (var i = 0; i < _count; i++)
+        {
+            list.Add(_span[i]);
+        }
+
+        return list;
+    }
+
     public ref struct Enumerator
     {
         private readonly Span<T> _span;

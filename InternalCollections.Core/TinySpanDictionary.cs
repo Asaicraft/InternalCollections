@@ -218,6 +218,26 @@ public ref struct TinySpanDictionary<TKey, TValue>
     /// </summary>
     public readonly ValueEnumerator Values => new(_span, _count);
 
+    /// <summary>
+    /// Copies the contents of the current dictionary into a new <see cref="Dictionary{TKey, TValue}"/>.
+    /// </summary>
+    /// <returns>
+    /// A new <see cref="Dictionary{TKey, TValue}"/> containing the same key-value pairs
+    /// and using the same key comparer as the original.
+    /// </returns>
+    public readonly Dictionary<TKey, TValue> ToDictionary()
+    {
+        var dictionary = new Dictionary<TKey, TValue>(_count, _keyComparer);
+
+        for (var i = 0; i < _count; i++)
+        {
+            var kvp = _span[i];
+            dictionary[kvp.Key] = kvp.Value;
+        }
+
+        return dictionary;
+    }
+
 
     [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public ref struct Enumerator
