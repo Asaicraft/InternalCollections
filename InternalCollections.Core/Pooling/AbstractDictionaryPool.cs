@@ -17,4 +17,12 @@ internal abstract class AbstractDictionaryPool<TKey, TValue>: AbstractCollection
     /// Gets the default dictionary pool implementation, based on ordered capacity.
     /// </summary>
     public static readonly OrderedDictionaryPool<TKey, TValue> Default = new();
+
+
+    public sealed override Dictionary<TKey, TValue> Rent(int capacity)
+    {
+        return Rent(capacity);
+    }
+
+    public abstract Dictionary<TKey, TValue> Rent(int capacity, IEqualityComparer<TKey>? comparer = null);
 }

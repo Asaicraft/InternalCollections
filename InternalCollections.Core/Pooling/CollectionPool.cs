@@ -38,10 +38,10 @@ public static class CollectionPool
         ListPool<T>.Return(list);
     }
 
-    public static Dictionary<TKey, TValue> RentDictionary<TKey, TValue>(int capacity)
+    public static Dictionary<TKey, TValue> RentDictionary<TKey, TValue>(int capacity, IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
-        return DictionaryPool.Rent<TKey, TValue>(capacity);
+        return DictionaryPool.Rent<TKey, TValue>(capacity, comparer);
     }
 
     public static void ReturnDictionary<TKey, TValue>(Dictionary<TKey, TValue> dictionary)

@@ -20,7 +20,7 @@ internal static class DictionaryPool
     /// <param name="capacity">The desired minimum capacity.</param>
     /// <returns>A pooled dictionary instance.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="capacity"/> is negative.</exception>
-    public static Dictionary<TKey, TValue> Rent<TKey, TValue>(int capacity)
+    public static Dictionary<TKey, TValue> Rent<TKey, TValue>(int capacity, IEqualityComparer<TKey>? comparer = null)
         where TKey : notnull
     {
 
@@ -29,7 +29,7 @@ internal static class DictionaryPool
             ThrowHelper.ThrowArgumentOutOfRangeException(nameof(capacity), "Capacity must be non-negative.");
         }
 
-        return OrderedDictionaryPool<TKey, TValue>.Default.Rent(capacity);
+        return OrderedDictionaryPool<TKey, TValue>.Default.Rent(capacity, comparer);
     }
 
     /// <summary>

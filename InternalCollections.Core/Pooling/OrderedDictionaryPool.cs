@@ -35,7 +35,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
     /// </summary>
     /// <param name="requiredCapacity">The minimum required capacity.</param>
     /// <returns>A dictionary instance from the pool or a new one if none is suitable.</returns>
-    public override Dictionary<TKey, TValue> Rent(int requiredCapacity)
+    public override Dictionary<TKey, TValue> Rent(int requiredCapacity, IEqualityComparer<TKey> comparer)
     {
         if (requiredCapacity > MaximumCapacity)
         {
@@ -78,11 +78,17 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
 
                 _s_sortedPool[--_s_poolCount] = null;
                 dictionary.Clear();
+
+                if(dictionary.Comparer is DynamicComparer<TKey> dynamicComparer)
+                {
+                    dynamicComparer.Comparer = comparer;
+                }
+
                 return dictionary;
             }
         }
 
-        return new Dictionary<TKey, TValue>(requiredCapacity);
+        return new Dictionary<TKey, TValue>(requiredCapacity, new DynamicComparer<TKey>(comparer));
     }
 
     /// <summary>
@@ -94,6 +100,13 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
     {
         if (dictionaryToReturn is null || dictionaryToReturn.GetCapacity() > MaximumCapacity)
         {
+            return;
+        }
+
+        if(dictionaryToReturn.Comparer is not DynamicComparer<TKey> dynamicComparer)
+        {
+            // If the comparer is not a DynamicComparer, we cannot change it.
+            // This is not our dictionary, so we cannot modify it.
             return;
         }
 
