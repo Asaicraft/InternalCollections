@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -360,6 +361,7 @@ public ref struct HybridSpanPoolList<T>
     /// </summary>
     public readonly void Dispose() => _rentableList.Dispose();
 
+    [EditorBrowsable(EditorBrowsableState.Never), Browsable(false)]
     public ref struct Enumerator
     {
         private readonly HybridSpanPoolList<T> _list;

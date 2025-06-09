@@ -1,27 +1,38 @@
 ﻿using CommunityToolkit.Diagnostics;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 
 namespace InternalCollections;
 
 /// <summary>
-/// Just a wrapper around a <see cref="Span{T}"/> that provides a dictionary-like interface.
-/// The list cannot grow: all operations are bounded by <see cref="Capacity"/>.
+/// A dictionary-like wrapper over a pair of <see cref="Span{T}"/> buffers for buckets and entries.
+/// Suitable for scenarios where heap allocations must be avoided and memory layout is tightly controlled.
+/// All operations are bounded by <see cref="Capacity"/>. The structure does not grow.
 /// </summary>
+/// <typeparam name="TKey">The type of the keys.</typeparam>
+/// <typeparam name="TValue">The type of the values.</typeparam>
 /// <remarks>
-/// <code>
+/// <para>
+/// <b>Important:</b> This struct is intended for advanced scenarios where the backing memory is externally managed (e.g. via <c>stackalloc</c>).
+/// </para>
+/// <para>
+/// For very small collections (e.g. &lt; 8 keys), consider using <see cref="TinySpanDictionary{TKey, TValue}"/> instead.
+/// </para>
+/// <para>
+/// Example usage:
+/// <code language="csharp">
 /// <![CDATA[
-/// // This example shows how to create a <see cref="SpanDictionary{TKey, TValue}"/> using stackalloc.
-/// 
 /// var capacity = 10;
 /// var size = HashHelpers.GetPrime(capacity);
 /// Span<int> buckets = stackalloc int[size];
 /// Span<HashEntry<TKey, TValue>> entries = stackalloc HashEntry<TKey, TValue>[size];
 /// var dictionary = new SpanDictionary<TKey, TValue>(buckets, entries);
+/// dictionary.Add("key", "value");
 /// ]]>
-/// 
 /// </code>
+/// </para>
 /// </remarks>
 public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 {
@@ -59,7 +70,15 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
     public readonly int Count => _count - _freeCount;
 
-    public readonly int Capacity => _buckets.Length;
+    public readonly int Capacity => _entries.Length;
+
+    public readonly bool IsEmpty => Count == 0;
+
+    public readonly IEqualityComparer<TKey> Comparer => _keyComparer;
+
+    public readonly bool IsDefault => _buckets == default && _entries == default;
+
+    public readonly bool IsDefaultOrEmpty => IsDefault || IsEmpty;
 
     public TValue this[TKey key]
     {
@@ -222,12 +241,10 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
     public void Clear()
     {
-        // обнуляем корзины
         for (var i = 0; i < _buckets.Length; i++)
         {
             _buckets[i] = 0;
         }
-        // обнуляем записи
         for (var i = 0; i < _count; i++)
         {
             _entries[i] = default;
@@ -236,5 +253,122 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
         _count = 0;
         _freeList = -1;
         _freeCount = 0;
+    }
+
+    public readonly Enumerator GetEnumerator() => new(this);
+    public readonly KeyEnumerator Keys => new(this);
+    public readonly ValueEnumerator Values => new(this);
+
+
+    [EditorBrowsable(EditorBrowsableState.Never), Browsable(false)]
+    public ref struct Enumerator
+    {
+        private readonly SpanDictionary<TKey, TValue> _dictionary;
+        private int _index;
+        private KeyValuePair<TKey, TValue> _current;
+
+        internal Enumerator(SpanDictionary<TKey, TValue> dictionary)
+        {
+            _dictionary = dictionary;
+            _index = -1;
+            _current = default!;
+        }
+
+        public bool MoveNext()
+        {
+            while (++_index < _dictionary._count)
+            {
+                ref var entry = ref _dictionary._entries[_index];
+                if (entry.Next >= -1)
+                {
+                    _current = new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public readonly KeyValuePair<TKey, TValue> Current => _current;
+
+        public void Reset()
+        {
+            _index = -1;
+            _current = default!;
+        }
+    }
+
+    public ref struct KeyEnumerator
+    {
+        private readonly SpanDictionary<TKey, TValue> _dict;
+        private int _index;
+        private TKey _current;
+
+        internal KeyEnumerator(SpanDictionary<TKey, TValue> dictionary)
+        {
+            _dict = dictionary;
+            _index = -1;
+            _current = default!;
+        }
+
+        public bool MoveNext()
+        {
+            while (++_index < _dict._count)
+            {
+                ref var entry = ref _dict._entries[_index];
+                if (entry.Next >= -1)
+                {
+                    _current = entry.Key;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public readonly TKey Current => _current;
+
+        public void Reset()
+        {
+            _index = -1;
+            _current = default!;
+        }
+
+        public readonly KeyEnumerator GetEnumerator() => this;
+    }
+
+    public ref struct ValueEnumerator
+    {
+        private readonly SpanDictionary<TKey, TValue> _dict;
+        private int _index;
+        private TValue _current;
+
+        internal ValueEnumerator(SpanDictionary<TKey, TValue> dictionary)
+        {
+            _dict = dictionary;
+            _index = -1;
+            _current = default!;
+        }
+
+        public bool MoveNext()
+        {
+            while (++_index < _dict._count)
+            {
+                ref var entry = ref _dict._entries[_index];
+                if (entry.Next >= -1)
+                {
+                    _current = entry.Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+        public readonly TValue Current => _current;
+
+        public void Reset()
+        {
+            _index = -1;
+            _current = default!;
+        }
+
+        public readonly ValueEnumerator GetEnumerator() => this;
     }
 }
