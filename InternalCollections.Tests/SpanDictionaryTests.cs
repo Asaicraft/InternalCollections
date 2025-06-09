@@ -129,16 +129,185 @@ public class SpanDictionaryTests
         var size = HashHelpers.GetPrime(3);
         Span<int> buckets = stackalloc int[size];
         Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
-        var dict = new SpanDictionary<int, int>(buckets, entries);
+        var dictionary = new SpanDictionary<int, int>(buckets, entries);
 
-        dict.Add(1, 10);
-        dict.Add(2, 20);
-        dict.Add(3, 30);
-        Assert.True(dict.Remove(2));
-        Assert.Equal(2, dict.Count);
+        dictionary.Add(1, 10);
+        dictionary.Add(2, 20);
+        dictionary.Add(3, 30);
+        Assert.True(dictionary.Remove(2));
+        Assert.Equal(2, dictionary.Count);
 
-        dict.Add(4, 40);
-        Assert.Equal(3, dict.Count);
-        Assert.Equal(40, dict[4]);
+        dictionary.Add(4, 40);
+        Assert.Equal(3, dictionary.Count);
+        Assert.Equal(40, dictionary[4]);
+    }
+
+    [Fact]
+    public void DefaultDictionary_IsDefaultAndEmpty()
+    {
+        Span<int> buckets = default;
+        Span<HashEntry<int, int>> entries = default;
+        var dictionary = new SpanDictionary<int, int>(buckets, entries);
+        Assert.True(dictionary.IsDefault);
+        Assert.True(dictionary.IsDefaultOrEmpty);
+        Assert.True(dictionary.IsEmpty);
+        Assert.Equal(0, dictionary.Count);
+    }
+
+    [Fact]
+    public void Enumeration_WorksForPairsKeysAndValues()
+    {
+        const int capacity = 7;
+        var size = HashHelpers.GetPrime(capacity);
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new SpanDictionary<int, int>(buckets, entries);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            dictionary.Add(i, i * 10);
+        }
+
+        // KeyValuePair
+        var seen = new List<KeyValuePair<int, int>>();
+        foreach (var keyValue in dictionary)
+        {
+            seen.Add(keyValue);
+        }
+
+        Assert.Equal(5, seen.Count);
+
+        // Keys
+        var keys = new List<int>();
+        foreach (var key in dictionary.Keys)
+        {
+            keys.Add(key);
+        }
+
+        Assert.Equal(Enumerable.Range(1, 5), keys);
+
+        // Values
+        var values = new List<int>();
+        foreach (var value in dictionary.Values)
+        {
+            values.Add(value);
+        }
+
+        Assert.Equal([10, 20, 30, 40, 50 ], values);
+    }
+
+    private sealed class BadComparer : IEqualityComparer<int>
+    {
+        public bool Equals(int x, int y) => x == y;
+        public int GetHashCode(int obj) => 42;
+    }
+
+    [Fact]
+    public void HandlesCollisions_CorrectlyChains()
+    {
+        const int capacity = 5;
+        var size = HashHelpers.GetPrime(capacity);
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new SpanDictionary<int, int>(buckets, entries, new BadComparer());
+
+        dictionary.Add(1, 100);
+        dictionary.Add(2, 200);
+        dictionary.Add(3, 300);
+        Assert.Equal(3, dictionary.Count);
+
+        Assert.Equal(100, dictionary[1]);
+        Assert.Equal(200, dictionary[2]);
+        Assert.Equal(300, dictionary[3]);
+    }
+
+    [Fact]
+    public void RemoveInCollisionChain_RechainsProperly()
+    {
+        var size = HashHelpers.GetPrime(4);
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new SpanDictionary<int, int>(buckets, entries, new BadComparer());
+
+        dictionary.Add(10, 1);
+        dictionary.Add(20, 2);
+        dictionary.Add(30, 3);
+        Assert.True(dictionary.Remove(20));     
+        Assert.False(dictionary.ContainsKey(20));
+
+        Assert.Equal(1, dictionary[10]);
+        Assert.Equal(3, dictionary[30]);
+
+        dictionary.Add(40, 4);
+        Assert.Equal(3, dictionary.Count);
+        Assert.Equal(4, dictionary[40]);
+    }
+
+    [Fact]
+    public void ReferenceTypeKeysAndValues_ArrayBacking_Works()
+    {
+        const int capacity = 3;
+        var size = HashHelpers.GetPrime(capacity);
+        var bucketsArray = new int[size];
+        var entriesArray = new HashEntry<string, string>[size];
+        Span<int> buckets = bucketsArray;
+        Span<HashEntry<string, string>> entries = entriesArray;
+        var dictionary = new SpanDictionary<string, string>(buckets, entries, StringComparer.OrdinalIgnoreCase);
+
+        dictionary.Add("One", "First");
+        dictionary.Add("Two", "Second");
+        Assert.Equal("First", dictionary["one"]);  
+        Assert.True(dictionary.ContainsKey("TWO"));
+
+        Assert.True(dictionary.Remove("ONE"));
+        Assert.False(dictionary.ContainsKey("One"));
+    }
+
+    [Fact]
+    public void AddDuplicate_ThrowsButIndexerOverwrites()
+    {
+        var size = HashHelpers.GetPrime(2);
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new SpanDictionary<int, int>(buckets, entries);
+
+        dictionary.Add(1, 10);
+
+        var thrown = false;
+        try
+        {
+            dictionary.Add(1, 20);
+        }
+        catch (ArgumentException)
+        {
+            thrown = true;
+        }
+
+        Assert.True(thrown);
+
+        dictionary[1] = 20;
+        Assert.Equal(20, dictionary[1]);
+    }
+
+    [Fact]
+    public void BulkInsert_LargeNumber_WorksWithinCapacity()
+    {
+        const int capacity = 50;
+        var size = HashHelpers.GetPrime(capacity);
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new SpanDictionary<int, int>(buckets, entries);
+
+        for (var i = 0; i < capacity; i++)
+        {
+            dictionary.Add(i, i * i);
+        }
+
+        Assert.Equal(capacity, dictionary.Count);
+        
+        for (var i = 0; i < capacity; i++)
+        {
+            Assert.Equal(i * i, dictionary[i]);
+        }
     }
 }
