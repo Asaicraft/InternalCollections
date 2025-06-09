@@ -105,6 +105,19 @@ public ref struct SpanList<T>
         _count++;
     }
 
+    public readonly int IndexOf(in T item)
+    {
+        for (var i = 0; i < _count; i++)
+        {
+            if (_span[i]!.Equals(item))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     /// <summary>
     /// Adds a range of items from <paramref name="source"/>.
     /// Throws if the source range does not fit.
@@ -140,6 +153,7 @@ public ref struct SpanList<T>
 
     /// <summary>
     /// Enumerator so the list can be used in <c>foreach</c>.
+    /// Enumeration is not checked for modifications and is not thread-safe.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly Enumerator GetEnumerator() => new(_span, _count);
@@ -148,12 +162,14 @@ public ref struct SpanList<T>
     /// Converts the contents of the list to a new array.
     /// </summary>
     /// <returns>A new array containing the elements of the list.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly T[] ToArray() => AsReadOnlySpan().ToArray();
 
     /// <summary>
     /// Converts the contents of the list to a new <see cref="List{T}"/>.
     /// </summary>
     /// <returns>A new <see cref="List{T}"/> containing the elements of the list.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly List<T> ToList()
     {
         var list = new List<T>(Capacity);
@@ -164,6 +180,61 @@ public ref struct SpanList<T>
         }
 
         return list;
+    }
+
+    /// <summary>
+    /// Checks if the list contains the specified item.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public readonly bool Contains(T item)
+    {
+        for (var i = 0; i < _count; i++)
+        {
+            if (EqualityComparer<T>.Default.Equals(_span[i], item))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public readonly void CopyTo(T[] array, int arrayIndex)
+    {
+        if (array == null)
+        {
+            throw new ArgumentNullException(nameof(array));
+        }
+
+        if (arrayIndex < 0 || arrayIndex > array.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Array index is out of range.");
+        }
+
+        if (array.Length - arrayIndex < Count)
+        {
+            throw new ArgumentException("The number of elements in the source HybridSpanPoolList is greater than the available space from arrayIndex to the end of the destination array.");
+        }
+
+        _span[.._count].CopyTo(array.AsSpan(arrayIndex));
+
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void RemoveAt(int index)
+    {
+        Guard.IsInRange(index, 0, _count, nameof(index));
+
+        var oldCount = _count;
+        var lastIndex = oldCount - 1;
+
+        if (index < lastIndex)
+        {
+            _span[(index + 1)..oldCount]
+                 .CopyTo(_span[index..]);
+        }
+
+        _count--;
     }
 
     public ref struct Enumerator

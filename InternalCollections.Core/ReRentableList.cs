@@ -1,8 +1,10 @@
-﻿using InternalCollections.Pooling;
+﻿using CommunityToolkit.Diagnostics;
+using InternalCollections.Pooling;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace InternalCollections;
@@ -26,16 +28,17 @@ public ref struct ReRentableList<T>
     {
         if (capacity < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+            ThrowHelper.ThrowArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
         }
         _list = CollectionPool.RentList<T>(capacity);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReRent(int capacity)
     {
         if (capacity < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
+            ThrowHelper.ThrowArgumentOutOfRangeException(nameof(capacity), "Capacity cannot be negative.");
         }
 
         if (_list != null && _list.Capacity >= capacity)
@@ -120,7 +123,7 @@ public ref struct ReRentableList<T>
     /// </summary>
     public readonly void Clear()
     {
-        _list.Clear();
+        _list?.Clear();
     }
 
     /// <summary>
@@ -130,6 +133,11 @@ public ref struct ReRentableList<T>
     /// <returns><c>true</c> if the item is found; otherwise, <c>false</c>.</returns>
     public readonly bool Contains(T item)
     {
+        if (_list == null)
+        {
+            return false; // If the list is not initialized, it cannot contain any items
+        }
+
         return _list.Contains(item);
     }
 
@@ -150,6 +158,11 @@ public ref struct ReRentableList<T>
     /// <returns>The index of the item if found; otherwise, –1.</returns>
     public readonly int IndexOf(T item)
     {
+        if (_list == null)
+        {
+            return -1; // If the list is not initialized, it cannot contain any items
+        }
+
         return _list.IndexOf(item);
     }
 
@@ -188,6 +201,11 @@ public ref struct ReRentableList<T>
     /// </summary>
     public readonly void Dispose()
     {
+        if (_list == null)
+        {
+            return; // Nothing to return
+        }
+
         CollectionPool.ReturnList(_list);
     }
 
@@ -231,13 +249,14 @@ public ref struct ReRentableList<T>
     /// Rents a larger list from the pool and replaces the current one.
     /// Used when the current list has reached its capacity.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void TryGrow(int additionalCount = 1)
     {
-        if (_list.Count + additionalCount - 1 < _list.Capacity)
+        if (_list?.Count + additionalCount - 1 < _list?.Capacity)
         {
             return; // No need to grow if we are not at capacity
         }
 
-        ReRent(_list.Capacity * 2);
+        ReRent((_list?.Capacity * 2) ?? 8);
     }
 }
