@@ -7,6 +7,13 @@ using System.Text;
 
 namespace InternalCollections;
 
+/// <summary>
+/// A ref struct wrapper over a pooled <see cref="Dictionary{TKey, TValue}"/> instance
+/// that can grow by re-renting a larger dictionary when needed. Automatically returns
+/// the dictionary to the pool on disposal.
+/// </summary>
+/// <typeparam name="TKey">The type of dictionary keys.</typeparam>
+/// <typeparam name="TValue">The type of dictionary values.</typeparam>
 public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
 {
     private Dictionary<TKey, TValue> _dictionary;
@@ -21,6 +28,11 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
         _dictionary = CollectionPool.RentDictionary<TKey, TValue>(capacity, comparer);
     }
 
+    /// <summary>
+    /// Attempts to grow the underlying dictionary if additional space is needed.
+    /// Automatically reallocates to a larger instance from the pool.
+    /// </summary>
+    /// <param name="additionalCount">The number of new items expected to be added.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void TryGrow(int additionalCount = 1)
     {
@@ -36,6 +48,13 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
             : 4);
     }
 
+    /// <summary>
+    /// Re-rents a new dictionary from the pool with at least the specified capacity.
+    /// Copies the current contents and returns the old instance to the pool.
+    /// </summary>
+    /// <param name="capacity">The new desired capacity.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="capacity"/> is negative.</exception>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReRent(int capacity)
     {
         if (capacity < 0)
@@ -84,6 +103,12 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
         }
     }
 
+    /// <summary>
+    /// Adds the specified key and value to the dictionary.
+    /// Automatically grows the dictionary if needed.
+    /// </summary>
+    /// <param name="key">The key to add.</param>
+    /// <param name="value">The value to associate with the key.</param>
     public void Add(TKey key, TValue value)
     {
         TryGrow();

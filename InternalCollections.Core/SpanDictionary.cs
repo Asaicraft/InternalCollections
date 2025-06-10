@@ -24,7 +24,7 @@ namespace InternalCollections;
 /// Example usage:
 /// <code language="csharp">
 /// <![CDATA[
-/// var capacity = 10;
+/// const int capacity = 10;
 /// var size = HashHelpers.GetPrime(capacity);
 /// Span<int> buckets = stackalloc int[size];
 /// Span<HashEntry<TKey, TValue>> entries = stackalloc HashEntry<TKey, TValue>[size];

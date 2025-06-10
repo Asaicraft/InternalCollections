@@ -7,14 +7,14 @@ using System.Threading.Tasks;
 
 namespace InternalCollections.Tests;
 
-public sealed class HybridSpanPoolListTests
+public sealed class HybridSpanRentListTests
 {
 
     [Fact]
     public void Ctor_InitialState()
     {
         Span<int> buffer = stackalloc int[4];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         Assert.Equal(0, list.Count);
         Assert.Equal(4, list.Capacity);
@@ -28,7 +28,7 @@ public sealed class HybridSpanPoolListTests
     public void Add_FillsSpan_NoPoolYet()
     {
         Span<int> buffer = stackalloc int[3];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         list.AddRange([1, 2, 3]);
 
@@ -42,7 +42,7 @@ public sealed class HybridSpanPoolListTests
     public void Add_BeyondSpan_AllocatesPoolAndKeepsOrder()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         list.Add(10);
         list.Add(11);
@@ -57,7 +57,7 @@ public sealed class HybridSpanPoolListTests
     public void AddRange_SplitBetweenSpanAndPool()
     {
         Span<int> buffer = stackalloc int[3];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         list.AddRange([1, 2, 3, 4, 5]);
 
@@ -71,7 +71,7 @@ public sealed class HybridSpanPoolListTests
     public void Indexer_Contains_IndexOf_WorkAcrossBothParts()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         list.AddRange([100, 200, 300]);
 
@@ -88,7 +88,7 @@ public sealed class HybridSpanPoolListTests
     public void Insert_ShiftsCorrectly_InSpan_AndInPool()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([1, 3]);
 
         list.Insert(1, 2);
@@ -102,7 +102,7 @@ public sealed class HybridSpanPoolListTests
     public void Remove_RemoveAt_Work()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([5, 6, 7]);
 
         Assert.True(list.Remove(6));
@@ -118,7 +118,7 @@ public sealed class HybridSpanPoolListTests
     public void Copy_And_Conversions()
     {
         Span<int> buffer = stackalloc int[3];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([1, 2, 3, 4]);
 
         var destination = new int[10];
@@ -135,7 +135,7 @@ public sealed class HybridSpanPoolListTests
     public void Enumerator_PreservesOrder()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([9, 8, 7]);
 
         int[] expected = [9, 8, 7];
@@ -153,7 +153,7 @@ public sealed class HybridSpanPoolListTests
     public void Clear_ResetsCount_Dispose_NoThrow()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([1, 2, 3]);
         Assert.True(list.IsListRented);
 
@@ -167,7 +167,7 @@ public sealed class HybridSpanPoolListTests
     public void AddRange_CreatesPool_Safely()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
 
         list.AddRange([1, 2, 3, 4]);   // 2=>span, 2=>pool
 
@@ -180,7 +180,7 @@ public sealed class HybridSpanPoolListTests
     public void Contains_IndexOf_NoPool_NoThrow()
     {
         Span<int> buffer = stackalloc int[3];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([10, 20]);
 
         Assert.False(list.IsListRented);
@@ -192,7 +192,7 @@ public sealed class HybridSpanPoolListTests
     public void Insert_End_WhenSpanFull_GoesToPool()
     {
         Span<int> buffer = stackalloc int[2];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([1, 2]);          // span full
 
         list.Insert(list.Count, 3);
@@ -204,7 +204,7 @@ public sealed class HybridSpanPoolListTests
     public void RemoveAt_FromSpan_NoPool()
     {
         Span<int> buffer = stackalloc int[3];
-        var list = new HybridSpanPoolList<int>(buffer);
+        var list = new HybridSpanRentList<int>(buffer);
         list.AddRange([5, 6]);
 
         list.RemoveAt(0);

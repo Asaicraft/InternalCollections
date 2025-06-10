@@ -13,7 +13,7 @@ namespace InternalCollections;
 /// Optimized for scenarios where most items fit in the stack buffer, but allows dynamic growth.
 /// </summary>
 /// <typeparam name="T">The type of elements in the list.</typeparam>
-public ref struct HybridSpanPoolList<T>
+public ref struct HybridSpanRentList<T>
 {
     // DO NOT MAKE THESE FIELDS READONLY
     // If these fields are marked as readonly,
@@ -26,7 +26,7 @@ public ref struct HybridSpanPoolList<T>
     /// Initializes the list using the provided span as the initial buffer.
     /// </summary>
     /// <param name="span">The span to use for initial storage.</param>
-    public HybridSpanPoolList(Span<T> span)
+    public HybridSpanRentList(Span<T> span)
     {
         _list = new SpanList<T>(span);
     }
@@ -35,7 +35,7 @@ public ref struct HybridSpanPoolList<T>
     /// Initializes the list from an existing <see cref="SpanList{T}"/>.
     /// </summary>
     /// <param name="spanList">The span list to use as the initial storage.</param>
-    public HybridSpanPoolList(SpanList<T> spanList)
+    public HybridSpanRentList(SpanList<T> spanList)
     {
         _list = spanList;
     }
@@ -364,9 +364,9 @@ public ref struct HybridSpanPoolList<T>
     [EditorBrowsable(EditorBrowsableState.Never), Browsable(false)]
     public ref struct Enumerator
     {
-        private readonly HybridSpanPoolList<T> _list;
+        private readonly HybridSpanRentList<T> _list;
         private int _index;
-        internal Enumerator(HybridSpanPoolList<T> list)
+        internal Enumerator(HybridSpanRentList<T> list)
         {
             _list = list;
             _index = -1;
