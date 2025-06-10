@@ -6,12 +6,12 @@ namespace InternalCollections.Pooling;
 
 internal sealed class DynamicComparer<T>: EqualityComparer<T>
 {
-    public DynamicComparer(IEqualityComparer<T> comparer)
+    public DynamicComparer(IEqualityComparer<T>? comparer)
     {
         Comparer = comparer;
     }
 
-    public IEqualityComparer<T> Comparer
+    public IEqualityComparer<T>? Comparer
     {
         get; set;
     }

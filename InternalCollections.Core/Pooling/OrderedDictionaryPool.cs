@@ -5,9 +5,9 @@ using System.Text;
 namespace InternalCollections.Pooling;
 
 /// <summary>
-/// A dictionary pool that maintains its entries in sorted order by internal capacity.
-/// Enables efficient reuse of dictionaries by matching the closest available capacity.
-/// Thread-safe via locking.
+/// A dictionary pool that maintains pooled <see cref="Dictionary{TKey, TValue}"/> instances
+/// in sorted order based on internal capacity. Enables reuse of similarly sized dictionaries
+/// and supports dynamic replacement of key comparers via <see cref="DynamicComparer{T}"/>.
 /// </summary>
 /// <typeparam name="TKey">The type of dictionary keys.</typeparam>
 /// <typeparam name="TValue">The type of dictionary values.</typeparam>
@@ -15,13 +15,13 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
     where TKey : notnull
 {
     /// <summary>
-    /// The maximum number of dictionary instances retained in the pool.
+    /// The maximum number of dictionaries that can be retained in the pool.
     /// </summary>
     public const int MaximumPoolSize = 16;
 
     /// <summary>
-    /// The maximum allowed capacity of a pooled dictionary.
-    /// Dictionaries with a larger internal capacity will not be pooled.
+    /// The maximum internal capacity of a pooled dictionary.
+    /// Dictionaries exceeding this capacity will not be pooled.
     /// </summary>
     public const int MaximumCapacity = 1103;
 
@@ -30,16 +30,21 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
     private static readonly object _s_poolLock = new();
 
     /// <summary>
-    /// Rents a <see cref="Dictionary{TKey, TValue}"/> from the pool with at least the specified capacity.
-    /// Uses binary search to find a best-fit dictionary.
+    /// Rents a dictionary from the pool with at least the specified capacity.
+    /// The dictionary uses a <see cref="DynamicComparer{TKey}"/> to allow mutable comparer injection.
     /// </summary>
-    /// <param name="requiredCapacity">The minimum required capacity.</param>
-    /// <returns>A dictionary instance from the pool or a new one if none is suitable.</returns>
-    public override Dictionary<TKey, TValue> Rent(int requiredCapacity, IEqualityComparer<TKey> comparer)
+    /// <param name="requiredCapacity">The minimum capacity required for the dictionary.</param>
+    /// <param name="comparer">The key comparer to use. May be <c>null</c> to use the default.</param>
+    /// <returns>
+    /// A pooled dictionary if one is available; otherwise, a new dictionary instance
+    /// with a dynamically replaceable comparer.
+    /// </returns>
+    public override Dictionary<TKey, TValue> Rent(int requiredCapacity, IEqualityComparer<TKey>? comparer = null)
     {
+
         if (requiredCapacity > MaximumCapacity)
         {
-            return new Dictionary<TKey, TValue>(requiredCapacity);
+            return new Dictionary<TKey, TValue>(requiredCapacity, comparer);
         }
 
         lock (_s_poolLock)
@@ -48,6 +53,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
             var right = _s_poolCount - 1;
             var matchedIndex = -1;
 
+            // Binary search to find smallest dictionary with Capacity >= requiredCapacity
             while (left <= right)
             {
                 var middleIndex = (left + right) >> 1;
@@ -68,6 +74,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
             {
                 var dictionary = _s_sortedPool[matchedIndex]!;
 
+                // Shift pool entries to maintain sorted order
                 Array.Copy(
                     sourceArray: _s_sortedPool,
                     sourceIndex: matchedIndex + 1,
@@ -79,9 +86,14 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
                 _s_sortedPool[--_s_poolCount] = null;
                 dictionary.Clear();
 
-                if(dictionary.Comparer is DynamicComparer<TKey> dynamicComparer)
+                // Dynamically rebind the comparer
+                if (dictionary.Comparer is DynamicComparer<TKey> dynamicComparer)
                 {
                     dynamicComparer.Comparer = comparer;
+                }
+                else
+                {
+                    dictionary = new Dictionary<TKey, TValue>(requiredCapacity, new DynamicComparer<TKey>(comparer));
                 }
 
                 return dictionary;
@@ -92,10 +104,13 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
     }
 
     /// <summary>
-    /// Returns a <see cref="Dictionary{TKey, TValue}"/> to the pool for reuse.
-    /// Dictionaries are inserted in sorted order by internal capacity.
+    /// Returns a dictionary to the pool for reuse.
+    /// Only dictionaries using a <see cref="DynamicComparer{TKey}"/> are accepted,
+    /// to allow safe comparer rebinding during future reuse.
     /// </summary>
-    /// <param name="dictionaryToReturn">The dictionary to return to the pool. Ignored if <c>null</c> or oversized.</param>
+    /// <param name="dictionaryToReturn">
+    /// The dictionary instance to return. If <c>null</c>, oversized, or using a non-dynamic comparer, it is discarded.
+    /// </param>
     public override void Return(Dictionary<TKey, TValue>? dictionaryToReturn)
     {
         if (dictionaryToReturn is null || dictionaryToReturn.GetCapacity() > MaximumCapacity)
@@ -105,8 +120,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
 
         if(dictionaryToReturn.Comparer is not DynamicComparer<TKey> dynamicComparer)
         {
-            // If the comparer is not a DynamicComparer, we cannot change it.
-            // This is not our dictionary, so we cannot modify it.
+            // Only dictionaries with a dynamic comparer are eligible for pooling
             return;
         }
 
@@ -124,6 +138,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
             var insertIndex = _s_poolCount;
             var capacityToReturn = dictionaryToReturn.GetCapacity();
 
+            // Binary search to find insertion point
             while (left <= right)
             {
                 var middleIndex = (left + right) >> 1;
@@ -139,6 +154,7 @@ internal sealed class OrderedDictionaryPool<TKey, TValue> : AbstractDictionaryPo
                 }
             }
 
+            // Shift items to insert in sorted position
             Array.Copy(
                 sourceArray: _s_sortedPool,
                 sourceIndex: insertIndex,
