@@ -24,12 +24,12 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void TryGrow(int additionalCount = 1)
     {
-        if (_dictionary.Count + additionalCount <= _dictionary.GetCapacity())
+        var capacity = _dictionary.GetCapacity();
+
+        if (_dictionary.Count + additionalCount <= capacity)
         {
             return;
         }
-
-        var capacity = _dictionary.GetCapacity();
 
         ReRent(capacity > 0
             ? capacity * 2
