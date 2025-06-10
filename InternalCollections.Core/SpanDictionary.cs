@@ -1,5 +1,9 @@
-﻿using CommunityToolkit.Diagnostics;
+﻿// This file is ported and adapted from the .NET source code (dotnet/runtime)
+// https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/Collections/Generic/Dictionary.cs
+
+using CommunityToolkit.Diagnostics;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
@@ -71,6 +75,8 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
     public readonly int Count => _count - _freeCount;
 
     public readonly int Capacity => _entries.Length;
+
+    public readonly bool IsFull => Count == Capacity;
 
     public readonly bool IsEmpty => Count == 0;
 
@@ -194,6 +200,44 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
     public readonly bool ContainsKey(TKey key) => TryGetValue(key, out _);
 
+    public readonly bool ContainsValue(TValue value)
+    {
+        if (value == null)
+        {
+            for (var i = 0; i < _count; i++)
+            {
+                if (_entries[i].Next >= -1 && _entries[i].Value == null)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (typeof(TValue).IsValueType)
+        {
+            // ValueType: Devirtualize with EqualityComparer<TValue>.Default intrinsic
+            for (var i = 0; i < _count; i++)
+            {
+                if (_entries[i].Next >= -1 && EqualityComparer<TValue>.Default.Equals(_entries[i].Value, value))
+                {
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            var defaultComparer = EqualityComparer<TValue>.Default;
+            for (var i = 0; i < _count; i++)
+            {
+                if (_entries![i].Next >= -1 && defaultComparer.Equals(_entries[i].Value, value))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public bool Remove(TKey key)
     {
         if (key == null)
@@ -276,15 +320,21 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
         public bool MoveNext()
         {
-            while (++_index < _dictionary._count)
+            // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+            // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+            while ((uint)_index < (uint)_dictionary._count)
             {
-                ref var entry = ref _dictionary._entries[_index];
+                ref var entry = ref _dictionary._entries![_index++];
+
                 if (entry.Next >= -1)
                 {
                     _current = new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
                     return true;
                 }
             }
+
+            _index = _dictionary._count + 1;
+            _current = default;
             return false;
         }
 
@@ -292,35 +342,41 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
         public void Reset()
         {
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
     }
 
     public ref struct KeyEnumerator
     {
-        private readonly SpanDictionary<TKey, TValue> _dict;
+        private readonly SpanDictionary<TKey, TValue> _dictionary;
         private int _index;
         private TKey _current;
 
         internal KeyEnumerator(SpanDictionary<TKey, TValue> dictionary)
         {
-            _dict = dictionary;
+            _dictionary = dictionary;
             _index = -1;
             _current = default!;
         }
 
         public bool MoveNext()
         {
-            while (++_index < _dict._count)
+            // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+            // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+            while ((uint)_index < (uint)_dictionary._count)
             {
-                ref var entry = ref _dict._entries[_index];
+                ref var entry = ref _dictionary._entries![_index++];
+
                 if (entry.Next >= -1)
                 {
                     _current = entry.Key;
                     return true;
                 }
             }
+
+            _index = _dictionary._count + 1;
+            _current = default!;
             return false;
         }
 
@@ -328,7 +384,7 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
         public void Reset()
         {
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
 
@@ -337,28 +393,34 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
     public ref struct ValueEnumerator
     {
-        private readonly SpanDictionary<TKey, TValue> _dict;
+        private readonly SpanDictionary<TKey, TValue> _dictionary;
         private int _index;
         private TValue _current;
 
         internal ValueEnumerator(SpanDictionary<TKey, TValue> dictionary)
         {
-            _dict = dictionary;
+            _dictionary = dictionary;
             _index = -1;
             _current = default!;
         }
 
         public bool MoveNext()
         {
-            while (++_index < _dict._count)
+            // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+            // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+            while ((uint)_index < (uint)_dictionary._count)
             {
-                ref var entry = ref _dict._entries[_index];
+                ref var entry = ref _dictionary._entries![_index++];
+
                 if (entry.Next >= -1)
                 {
                     _current = entry.Value;
                     return true;
                 }
             }
+
+            _index = _dictionary._count + 1;
+            _current = default!;
             return false;
         }
         public readonly TValue Current => _current;

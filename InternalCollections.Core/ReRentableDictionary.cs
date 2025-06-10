@@ -79,11 +79,15 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
         _dictionary = newDict;
     }
 
-    public readonly int Count => _dictionary.Count;
+    public readonly int Count => _dictionary?.Count ?? 0;
 
-    public readonly int Capacity => _dictionary.GetCapacity();
+    public readonly int Capacity => _dictionary?.GetCapacity() ?? 0;
 
-    public readonly bool IsEmpty => _dictionary.Count == 0;
+    public readonly bool IsEmpty => Count  == 0;
+
+    public readonly bool IsDefault => _dictionary == default;
+
+    public readonly bool IsDefaultOrEmpty => IsDefault || IsEmpty;
 
     public TValue this[TKey key]
     {
