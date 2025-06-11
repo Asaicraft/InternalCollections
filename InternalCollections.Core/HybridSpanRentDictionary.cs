@@ -20,7 +20,11 @@ public ref struct HybridSpanRentDictionary<TKey, TValue>
         IEqualityComparer<TKey>? comparer = null)
     {
         _dictionary = new SpanDictionary<TKey, TValue>(buckets, entries, comparer);
-        _rentableDictionary = default;
+    }
+
+    public HybridSpanRentDictionary(SpanDictionary<TKey, TValue> dictionary)
+    {
+        _dictionary = dictionary;
     }
 
     public readonly int Count => _dictionary.Count + _rentableDictionary.Count;
@@ -46,12 +50,25 @@ public ref struct HybridSpanRentDictionary<TKey, TValue>
         }
         set
         {
+            if (_dictionary.ContainsKey(key))
+            {
+                _dictionary[key] = value;
+                return;
+            }
+
+            if (!_rentableDictionary.IsDefault && _rentableDictionary.ContainsKey(key))
+            {
+                _rentableDictionary[key] = value;
+                return;
+            }
+
             if (!_dictionary.IsFull)
             {
                 _dictionary[key] = value;
             }
             else
             {
+                TryRent();
                 _rentableDictionary[key] = value;
             }
         }
@@ -64,6 +81,7 @@ public ref struct HybridSpanRentDictionary<TKey, TValue>
         }
         else
         {
+            TryRent();
             _rentableDictionary.Add(key, value);
         }
     }
@@ -94,21 +112,24 @@ public ref struct HybridSpanRentDictionary<TKey, TValue>
         {
             var removed = _dictionary.Remove(key);
 
-            // if we removed from the span part,
-            // we need to move one item from the rentable part to the span part
             if (removed && _rentableDictionary.Count > 0)
             {
-                var keyValue = _rentableDictionary.GetEnumerator().Current;
-                _rentableDictionary.Remove(keyValue.Key);
-                _dictionary.Add(keyValue.Key, keyValue.Value);
+                // get the first item from the rentable dictionary
+                var rentedEnumerator = _rentableDictionary.GetEnumerator();
+                if (rentedEnumerator.MoveNext())
+                {
+                    var keyValue = rentedEnumerator.Current;
+
+                    // move the first item from the rentable dictionary to the span dictionary
+                    _rentableDictionary.Remove(keyValue.Key);
+                    _dictionary.Add(keyValue.Key, keyValue.Value);
+                }
             }
 
             return removed;
         }
-        else
-        {
-            return _rentableDictionary.Remove(key);
-        }
+
+        return _rentableDictionary.Remove(key);
     }
 
     public void Clear()
@@ -164,45 +185,53 @@ public ref struct HybridSpanRentDictionary<TKey, TValue>
         _rentableDictionary.Dispose();
     }
 
+    private void TryRent()
+    {
+        if (_rentableDictionary.IsDefault)
+        {
+            _rentableDictionary = new(_dictionary.Capacity, _dictionary.Comparer);
+        }
+    }
+
     public ref struct Enumerator
     {
         private readonly HybridSpanRentDictionary<TKey, TValue> _hybrid;
         private bool _inSpan;
-        private SpanDictionary<TKey, TValue>.Enumerator _spanEnum;
-        private Dictionary<TKey, TValue>.Enumerator _fallbackEnum;
+        private SpanDictionary<TKey, TValue>.Enumerator _spanEnumerator;
+        private Dictionary<TKey, TValue>.Enumerator _rentableEnumerator;
 
         internal Enumerator(HybridSpanRentDictionary<TKey, TValue> hybrid)
         {
             _hybrid = hybrid;
             _inSpan = true;
-            _spanEnum = hybrid._dictionary.GetEnumerator();
-            _fallbackEnum = default;
+            _spanEnumerator = hybrid._dictionary.GetEnumerator();
+            _rentableEnumerator = default;
         }
 
         public KeyValuePair<TKey, TValue> Current
             => _inSpan
-                ? _spanEnum.Current
-                : _fallbackEnum.Current;
+                ? _spanEnumerator.Current
+                : _rentableEnumerator.Current;
 
         public bool MoveNext()
         {
             if (_inSpan)
             {
-                if (_spanEnum.MoveNext())
+                if (_spanEnumerator.MoveNext())
                 {
                     return true;
                 }
                 _inSpan = false;
-                _fallbackEnum = _hybrid._rentableDictionary.GetEnumerator();
+                _rentableEnumerator = _hybrid._rentableDictionary.GetEnumerator();
             }
-            return _fallbackEnum.MoveNext();
+            return _rentableEnumerator.MoveNext();
         }
 
         public void Reset()
         {
             _inSpan = true;
-            _spanEnum.Reset();
-            _fallbackEnum = default;
+            _spanEnumerator.Reset();
+            _rentableEnumerator = default;
         }
     }
 }

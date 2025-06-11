@@ -314,7 +314,7 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
         internal Enumerator(SpanDictionary<TKey, TValue> dictionary)
         {
             _dictionary = dictionary;
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
 

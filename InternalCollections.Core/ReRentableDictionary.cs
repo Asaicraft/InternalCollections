@@ -119,15 +119,40 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
         _dictionary.Add(key, value);
     }
 
-    public readonly bool Remove(TKey key) => _dictionary.Remove(key);
+    public readonly bool Remove(TKey key) => _dictionary?.Remove(key) ?? false;
 
-    public readonly void Clear() => _dictionary.Clear();
+    public readonly void Clear() => _dictionary?.Clear();
 
-    public readonly bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
+    public readonly bool TryGetValue(TKey key, out TValue value)
+    {
+        if(IsDefaultOrEmpty)
+        {
+            value = default!;
+            return false;
+        }
 
-    public readonly bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
+        return _dictionary.TryGetValue(key, out value);
+    }
 
-    public readonly bool ContainsValue(TValue value) => _dictionary.ContainsValue(value);
+    public readonly bool ContainsKey(TKey key)
+    {
+        if (IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        return _dictionary.ContainsKey(key);
+    }
+
+    public readonly bool ContainsValue(TValue value)
+    {
+        if (IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        return _dictionary.ContainsValue(value);
+    }
 
     public readonly Dictionary<TKey, TValue> ToDictionary() => new(_dictionary);
 
@@ -136,5 +161,13 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
         CollectionPool.ReturnDictionary(_dictionary);
     }
 
-    public readonly Dictionary<TKey, TValue>.Enumerator GetEnumerator() => _dictionary.GetEnumerator();
+    public readonly Dictionary<TKey, TValue>.Enumerator GetEnumerator()
+    {
+        if(IsDefault)
+        {
+            ThrowHelper.ThrowInvalidOperationException("Cannot enumerate a default ReRentableDictionary instance.");
+        }
+
+        return _dictionary.GetEnumerator();
+    }
 }

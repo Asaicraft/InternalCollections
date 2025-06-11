@@ -21,8 +21,13 @@ internal static class DictionaryCapacityExtensions
     /// <param name="dictionary">The dictionary instance.</param>
     /// <returns>The capacity (number of internal entry slots).</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetCapacity<TKey, TValue>(this Dictionary<TKey, TValue> dictionary)
+    public static int GetCapacity<TKey, TValue>(this Dictionary<TKey, TValue>? dictionary)
     {
+        if(dictionary == null)
+        {
+            return 0;
+        }
+
 #if NET9_0_OR_GREATER
         return dictionary.Capacity;
 #else
