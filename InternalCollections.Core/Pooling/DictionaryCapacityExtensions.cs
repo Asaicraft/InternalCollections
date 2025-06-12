@@ -40,21 +40,12 @@ internal static class DictionaryCapacityExtensions
     static class CapacityGetter<TKey, TValue>
         where TKey : notnull
     {
-#if NET8_0
-        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_entries")]
-        public static extern Array GetEntriesField(Dictionary<TKey, TValue> dictionary);
-#else
         public static readonly FieldInfo EntriesField = typeof(Dictionary<TKey, TValue>)
             .GetField("_entries", BindingFlags.NonPublic | BindingFlags.Instance)!;
-#endif
 
         public static int GetInternalCapacity(Dictionary<TKey, TValue> dictionary)
         {
-#if NET8_0
-            var entries = GetEntriesField(dictionary)!;
-#else
             var entries = (Array)EntriesField.GetValue(dictionary)!;
-#endif
 
             return entries?.Length ?? 0;
         }

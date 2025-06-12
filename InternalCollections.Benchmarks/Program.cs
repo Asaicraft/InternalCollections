@@ -141,7 +141,7 @@ public class SpanListBenchmark
     public int SpanListAddAndIterate()
     {
         Span<int> buffer = stackalloc int[Count];
-        var spanList = new SpanList<int>(buffer[..Count]);
+        var spanList = new SpanList<int>(buffer.Slice(0, Count));
 
         for (var index = 0; index < Count; index++)
         {
@@ -188,7 +188,7 @@ public class TinyDictionaryBenchmark
     public int TinyDictionaryAddAndFind()
     {
         Span<KeyValuePair<int, int>> buffer = stackalloc KeyValuePair<int, int>[32];
-        var tinyDictionary = new TinySpanDictionary<int, int>(buffer[..Count]);
+        var tinyDictionary = new TinySpanDictionary<int, int>(buffer.Slice(0, Count));
 
         for (var index = 0; index < Count; index++)
         {
