@@ -356,7 +356,7 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
         internal KeyEnumerator(SpanDictionary<TKey, TValue> dictionary)
         {
             _dictionary = dictionary;
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
 
@@ -400,7 +400,7 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
         internal ValueEnumerator(SpanDictionary<TKey, TValue> dictionary)
         {
             _dictionary = dictionary;
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
 
@@ -427,7 +427,7 @@ public ref struct SpanDictionary<TKey, TValue> where TKey : notnull
 
         public void Reset()
         {
-            _index = -1;
+            _index = 0;
             _current = default!;
         }
 
