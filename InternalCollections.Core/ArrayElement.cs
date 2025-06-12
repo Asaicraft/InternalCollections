@@ -8,6 +8,11 @@ namespace InternalCollections;
 /// Represents a wrapper for an _elements element to avoid performance penalties
 /// associated with _elements covariance and struct return mechanics.
 /// </summary>
+/// <remarks>
+/// This struct was originally introduced to avoid performance issues caused by array covariance,
+/// where each assignment requires a runtime type check. Modern JIT compilers often optimize
+/// away such checks, making this struct potentially unnecessary in some cases.
+/// </remarks>
 /// <typeparam name="T">The type of the element.</typeparam>
 public struct ArrayElement<T> where T : class
 {

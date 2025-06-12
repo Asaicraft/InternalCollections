@@ -28,7 +28,7 @@ namespace InternalCollections;
 /// as it avoids the extra indirection and abstraction introduced by this class.
 /// </para>
 /// </remarks>
-public sealed class InvariantArray<T>: IReadOnlyList<T> where T : class
+public sealed class InvariantArray<T> : IReadOnlyList<T> where T : class
 {
     private readonly ArrayElement<T>[] _elements;
 
@@ -55,14 +55,15 @@ public sealed class InvariantArray<T>: IReadOnlyList<T> where T : class
     }
 
     /// <inheritdoc />
-    public IEnumerator<T> GetEnumerator()
-        => new Enumerator(_elements);
+    public Enumerator GetEnumerator() => new(_elements);
+
 
     /// <inheritdoc />
-    IEnumerator IEnumerable.GetEnumerator()
-        => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private struct Enumerator(ArrayElement<T>[] array) : IEnumerator<T>
+    IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+
+    public struct Enumerator(ArrayElement<T>[] array) : IEnumerator<T>
     {
         private readonly ArrayElement<T>[] _array = array;
         private int _index = -1;
