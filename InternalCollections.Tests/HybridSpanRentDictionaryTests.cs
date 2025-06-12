@@ -138,6 +138,11 @@ public sealed class HybridSpanRentDictionaryTests
         Assert.Equal(3, dictionary.Count);
         Assert.True(dictionary.IsSpanFull);
         Assert.True(dictionary.IsDictionaryRented);
+
+        dictionary.Remove(4);
+
+        Assert.False(dictionary.IsSpanFull);
+        Assert.True(dictionary.IsDictionaryRented);
     }
 
     [Fact]
@@ -200,5 +205,76 @@ public sealed class HybridSpanRentDictionaryTests
         Assert.True(dictionary.IsEmpty);
         Assert.False(dictionary.IsSpanFull);
         dictionary.Dispose();
+    }
+
+    private sealed class BadComparer : IEqualityComparer<int>
+    {
+        public bool Equals(int x, int y) => x == y;
+        public int GetHashCode(int _) => 42; 
+    }
+
+    [Fact]
+    public void Constructor_WithCustomComparer_RespectsComparer()
+    {
+        const int capacity = 2;
+        var size = HashHelpers.GetPrime(capacity);
+        var comparer = new BadComparer();
+
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new HybridSpanRentDictionary<int, int>(buckets, entries, comparer);
+
+        dictionary.Add(10, 1);
+        dictionary.Add(20, 2);
+        dictionary.Add(30, 3);
+
+        Assert.True(dictionary.ContainsKey(20));
+        Assert.Equal(3, dictionary.Count);
+
+        Assert.Same(comparer, dictionary.Comparer);
+    }
+
+    [Fact]
+    public void Add_DuplicateKey_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+        {
+            const int capacity = 2;
+            var size = HashHelpers.GetPrime(capacity);
+
+            Span<int> buckets = stackalloc int[size];
+            Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+            var dictionary = new HybridSpanRentDictionary<int, int>(buckets, entries);
+
+            dictionary.Add(1, 100);
+            dictionary.Add(1, 100); // Attempt to add duplicate key
+
+        });
+    }
+
+    [Fact]
+    public void Indexer_OverwriteAcrossSpanAndRentable_HonoursExistingKeys()
+    {
+        const int capacity = 2;
+        var size = HashHelpers.GetPrime(capacity);
+
+        Span<int> buckets = stackalloc int[size];
+        Span<HashEntry<int, int>> entries = stackalloc HashEntry<int, int>[size];
+        var dictionary = new HybridSpanRentDictionary<int, int>(buckets, entries);
+
+        dictionary.Add(1, 10);   // span
+        dictionary.Add(2, 20);   // span
+        dictionary.Add(3, 30);   // span
+        dictionary.Add(4, 40);   // rentable
+
+        dictionary[2] = 22; // overwrite in span
+
+        dictionary[4] = 44;
+
+        Assert.Equal(22, dictionary[2]);
+        Assert.Equal(44, dictionary[4]);
+        Assert.Equal(4, dictionary.Count);
+        Assert.True(dictionary.IsSpanFull);
+        Assert.True(dictionary.IsDictionaryRented);
     }
 }

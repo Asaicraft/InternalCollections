@@ -89,6 +89,19 @@ public ref struct ReRentableDictionary<TKey, TValue> where TKey : notnull
 
     public readonly bool IsDefaultOrEmpty => IsDefault || IsEmpty;
 
+    public readonly IEqualityComparer<TKey> Comparer
+    {
+        get
+        {
+            if(_dictionary.Comparer is DynamicComparer<TKey> dynamicComparer)
+            {
+                return dynamicComparer.Comparer ?? EqualityComparer<TKey>.Default;
+            }
+
+            return _dictionary.Comparer ?? EqualityComparer<TKey>.Default;
+        }
+    }
+
     public TValue this[TKey key]
     {
         readonly get => _dictionary[key];
