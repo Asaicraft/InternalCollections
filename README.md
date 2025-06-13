@@ -18,16 +18,17 @@ necessary, and never resize implicit arrays behind your back.
 |---|------|------|--------------|
 | 1 | **`ArrayElement<T>`** | `struct` | Wraps an array element to bypass covariance checks and costly struct returns. |
 | 2 | **`InvariantArray<T>`** | `sealed class` | Fixed-size `IReadOnlyList<T>` over `ArrayElement<T>[]`; no covariance. |
-| 3 | **`RefSpan<T>`** | `ref struct` | “Span” of `GCHandle`s for pinning reference objects without extra allocations. |
-| 4 | **`SpanList<T>`** | `ref struct` | Non-growing list over a caller-supplied `Span<T>`; zero heap work. |
-| 5 | **`RentedList<T>`** | `readonly ref struct` | List rented from a pool; automatically returned on `Dispose()`. |
-| 6 | **`ReRentableList<T>`** | `ref struct` | Like `RentedList`, but when full it rents a *larger* list and returns the old one, avoiding the internal array migration `List<T>` would perform. |
-| 7 | **`HybridSpanRentList<T>`** | `ref struct` | Starts in the stack buffer (`SpanList`); spills into `ReRentableList` when full. |
-| 8 | **`TinySpanDictionary<TKey,TValue>`** | `ref struct` | Fixed-capacity map backed by a `Span<KeyValuePair<,>>`; ideal for ≤ 8 keys. |
-| 9 | **`SpanDictionary<TKey,TValue>`** | `ref struct` | True hash table over two spans (buckets + entries); never grows. |
-|10 | **`RentedDictionary<TKey,TValue>`** | `readonly ref struct` | Pooled `Dictionary<,>` wrapper; returned on `Dispose()`. |
-|11 | **`ReRentableDictionary<TKey,TValue>`** | `ref struct` | Pooled dictionary that re-rents a larger one when capacity is exceeded (no hidden realloc). |
-|12 | **`HybridSpanRentDictionary<TKey,TValue>`** | `ref struct` | Starts in a `SpanDictionary`; when full, switches to a `ReRentableDictionary`. |
+| 3 | **`RefElement<T>`** | `ref struct` | Single-object pin/handle without heap allocations. |
+| 4 | **`RefSpan<T>`** | `ref struct` | “Span” of `GCHandle`s for pinning many reference objects. |
+| 5 | **`SpanList<T>`** | `ref struct` | Non-growing list over a caller-supplied `Span<T>`. |
+| 6 | **`RentedList<T>`** | `readonly ref struct` | `List<T>` from a pool; auto-return on `Dispose()`. |
+| 7 | **`ReRentableList<T>`** | `ref struct` | Like #6 but re-rents a *larger* list instead of letting `List<T>` reallocate its array. |
+| 8 | **`HybridSpanRentList<T>`** | `ref struct` | Starts in `SpanList`; spills into `ReRentableList` when full. |
+| 9 | **`TinySpanDictionary<TKey,TValue>`** | `ref struct` | Fixed-capacity map backed by a `Span<KeyValuePair<,>>`; ideal for ≤ 8 keys. |
+|10 | **`SpanDictionary<TKey,TValue>`** | `ref struct` | True hash table over two spans (buckets + entries); never grows. |
+|11 | **`RentedDictionary<TKey,TValue>`** | `readonly ref struct` | Pooled `Dictionary<,>` wrapper; auto-return on `Dispose()`. |
+|12 | **`ReRentableDictionary<TKey,TValue>`** | `ref struct` | Pooled dictionary that re-rents a larger one when full. |
+|13 | **`HybridSpanRentDictionary<TKey,TValue>`** | `ref struct` | Starts in a `SpanDictionary`; spills into a `ReRentableDictionary`. |
 
 All structs are **allocation-free** and live on the stack (except the *rented*
 parts that explicitly use pooling).
@@ -66,6 +67,15 @@ foreach (var n in names)
 {
     Console.WriteLine(n); // Alice Bob Eve
 }
+```
+
+`RefElement<T>`:
+```csharp
+var element = new RefElement<byte[]>(new byte[256]);
+
+Console.WriteLine(element.Value!.Length); // 256
+
+element.Value = null;   // frees handle
 ```
 
 `RefSpan<T>`:
