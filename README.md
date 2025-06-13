@@ -50,8 +50,8 @@ Targets `netstandard2.0`, `net8.0`, and `net9.0`.
 var raw = new[] { "one", "two", "three" };
 ArrayElement<string>[] elements = ArrayElement<string>.MakeElementArray(raw);
 
-elements[1].Value = "TWO";          // no covariance check
-Console.WriteLine(elements[1]);     // implicit cast → "TWO"
+elements[1].Value = "TWO"; // no covariance check
+Console.WriteLine(elements[1].Value);
 ```
 
 `InvariantArray<T>`:
@@ -138,9 +138,9 @@ var tiny = new TinySpanDictionary<int,char>(buffer);
 
 tiny.Add(1, 'o');
 tiny.Add(2, 't');
-tiny.AddOrSet(1, 'u');            // overwrite
+tiny.AddOrSet(1, 'u');        // overwrite
 
-Console.WriteLine(tiny[1]);         // 'u'
+Console.WriteLine(tiny[1]);   // 'u'
 ```
 
 `SpanDictionary<TKey, TValue>`:
@@ -165,24 +165,26 @@ Console.WriteLine(map.ContainsKey(1));  // True
 
 `ReRentableDictionary<TKey, TValue>`:
 ```csharp
-var growMap = new ReRentableDictionary<string,int>(capacity: 2);
+var growMap = new ReRentableDictionary<string,int>(capacity: 2); // true capacity will be 3
 growMap.Add("A", 1);
 growMap.Add("B", 2);
-growMap.Add("C", 3);                  // re-rents larger dictionary
+growMap.Add("C", 3);
+growMap.Add("D", 4);                  // re-rents larger dictionary
 Console.WriteLine(growMap.Capacity);  // ≥ 4
 growMap.Dispose();
 ```
 
 `HybridSpanRentDictionary<TKey, TValue>`:
 ```csharp
-int s = HashHelpers.GetPrime(2);
+int s = HashHelpers.GetPrime(2); // size will be 3
 Span<int> b = stackalloc int[s];
 Span<HashEntry<int,int>> e = stackalloc HashEntry<int,int>[s];
 
 var hybrid = new HybridSpanRentDictionary<int,int>(b, e);
 hybrid.Add(10, 100);   // span
 hybrid.Add(20, 200);   // span
-hybrid.Add(30, 300);   // pooled
+hybrid.Add(30, 300);   // span
+hybrid.Add(40, 400);   // pooled
 
 Console.WriteLine(hybrid.IsDictionaryRented); // True
 ```
