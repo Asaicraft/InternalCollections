@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using InternalCollections;
 using InternalCollections.Benchmarks;
@@ -251,4 +250,64 @@ public class RefSpanBenchmark
         return sum;
     }
 
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline1ListBenchmark
+{
+    [Params(0, 1, 2, 16)]
+    public int Count;
+
+    private List<int> _stdList = null!;
+    private Inline1List<int> _inline1 = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _stdList = new List<int>(Count);
+        _inline1 = [];
+
+        for (var i = 0; i < Count; i++)
+        {
+            _stdList.Add(i);
+            _inline1.Add(i);
+        }
+    }
+
+    [Benchmark(Baseline = true)]
+    public int List_AddIterate()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline1List_AddIterate()
+    {
+        var list = new Inline1List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
 }
