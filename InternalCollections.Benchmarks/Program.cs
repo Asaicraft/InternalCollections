@@ -487,3 +487,79 @@ public class Inline2ListBenchmark_Indexer
         return _inline2List[ElementCount - 1];
     }
 }
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline2ListBenchmark_Remove
+{
+    [Params(0, 1, 2, 3, 16)]
+    public int Count;
+
+    [Benchmark(Baseline = true)]
+    public int List_RemoveByValueSequential()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            list.Remove(i);
+        }
+
+        return list.Count; 
+    }
+
+    [Benchmark]
+    public int Inline2_RemoveByValueSequential()
+    {
+        var list = new Inline2List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            list.Remove(i);
+        }
+
+        return list.Count;
+    }
+
+    [Benchmark]
+    public int List_RemoveFrontLoop()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        while (list.Count != 0)
+        {
+            list.RemoveAt(0);
+        }
+
+        return list.Count; 
+    }
+
+    [Benchmark]
+    public int Inline2_RemoveFrontLoop()
+    {
+        var list = new Inline2List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        while (list.Count != 0)
+        {
+            list.RemoveAt(0);
+        }
+
+        return list.Count;
+    }
+}
