@@ -8,13 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace InternalCollections;
-
-/// <summary>
-/// Stores up to two items inline to avoid heap allocations.
-/// Creates a <see cref="List{T}"/> to store additional elements when more than two items are added.
-/// Optimized for small collections with zero, one, or two elements.
-/// </summary>
-public sealed class Inline2List<T> : IList<T>
+public sealed class Inline3List<T> : IList<T>
 {
     private const byte InlineMask = 0b0000_0011;
     private const byte VersionMask = 0b1111_1100;
@@ -31,14 +25,18 @@ public sealed class Inline2List<T> : IList<T>
     private T _item1 = default!;
 
     /// <summary>
-    /// Backing list used when more than two items are stored.
+    /// Third inline item stored directly in the structure if present.
+    /// </summary>
+    private T _item2 = default!;
+
+    /// <summary>
+    /// Backing list used when more than three items are stored.
     /// </summary>
     private List<T>? _list;
 
     /// <summary>
-    /// Stores two pieces of information:
-    /// Bits 0–1: Inline count (0, 1, or 2) indicating how many inline items are stored.
-    /// Bits 2–7: A 6-bit version number used for enumerator versioning.
+    /// Bits 0-1: inline count (0-3).  
+    /// Bits 2-7: 6-bit version for enumerator validation.
     /// </summary>
     private byte _inlineData;
 
@@ -77,7 +75,7 @@ public sealed class Inline2List<T> : IList<T>
     /// <summary>
     /// Gets the total capacity including both inline items and the backing list.
     /// </summary>
-    public int Capacity => 2 + ListCapacity;
+    public int Capacity => 3 + ListCapacity;
 
     /// <summary>
     /// Gets the capacity of the backing list.
@@ -88,13 +86,13 @@ public sealed class Inline2List<T> : IList<T>
 
     /// <summary>
     /// Gets or sets the element at the specified index.
-    /// Index 0 corresponds to the first inline item; index 1 to the second inline item if present;
-    /// subsequent indices access elements in the backing list.
+    /// Index 0 corresponds to the first inline item; index 1 to the second; index 2 to the third inline item.
+    /// Indices 3 and above access elements from the backing list.
     /// </summary>
     /// <param name="index">The zero-based index of the element to get or set.</param>
     /// <returns>The element at the specified index.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when the index is less than 0 or greater than or equal to <see cref="Count"/>.
+    /// Thrown when <paramref name="index"/> is less than 0 or greater than or equal to <see cref="Count"/>.
     /// </exception>
     public T this[int index]
     {
@@ -116,9 +114,13 @@ public sealed class Inline2List<T> : IList<T>
                 return _item1;
             }
 
-            return _list![index - 2];
-        }
+            if (index == 2)
+            {
+                return _item2;
+            }
 
+            return _list![index - 3];
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
@@ -135,9 +137,13 @@ public sealed class Inline2List<T> : IList<T>
             {
                 _item1 = value;
             }
+            else if (index == 2)
+            {
+                _item2 = value;
+            }
             else
             {
-                _list![index - 2] = value;
+                _list![index - 3] = value;
             }
 
             _inlineData = IncrementVersion(_inlineData);
@@ -152,81 +158,110 @@ public sealed class Inline2List<T> : IList<T>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Add(T item)
     {
-        if ((_inlineData & InlineMask) == 0)
+        var inlineCount = _inlineData & InlineMask;
+
+        if (inlineCount == 0)
         {
             _item0 = item;
             _inlineData = MakeInlineAndVersion(1, _inlineData);
         }
-        else if ((_inlineData & InlineMask) == 1)
+        else if (inlineCount == 1)
         {
             _item1 = item;
             _inlineData = MakeInlineAndVersion(2, _inlineData);
         }
+        else if (inlineCount == 2)
+        {
+            _item2 = item;
+            _inlineData = MakeInlineAndVersion(3, _inlineData);
+        }
         else
         {
-            // backing-list
             (_list ??= new List<T>(4)).Add(item);
             _inlineData = IncrementVersion(_inlineData);
         }
     }
 
-    /// <summary>
-    /// Inserts an item at the specified index.
-    /// Handles inline-to-list promotion if necessary.
-    /// </summary>
-    /// <param name="index">The zero-based index at which the item should be inserted.</param>
-    /// <param name="item">The item to insert.</param>
     public void Insert(int index, T item)
     {
-        if ((uint)index > (uint)Count)
+        var inlineCount = _inlineData & InlineMask;
+        var count = ListCount + inlineCount;
+
+        if ((uint)index > (uint)count)
         {
             ThrowHelper.ThrowArgumentOutOfRangeException(nameof(index));
         }
 
-        var inlineCount = (_inlineData & InlineMask);
-
-        // Empty collection case
-        if (inlineCount == 0)
+        if (inlineCount < 3)
         {
-            _item0 = item;
-            _inlineData = MakeInlineAndVersion(1, _inlineData);
-            return;
-        }
-
-        // Inline count is 1, we can insert the item inline
-        if (inlineCount == 1)
-        {
-            if (index == 0)
+            // index == 0
+            if (inlineCount == 0)
             {
-                _item1 = _item0;
                 _item0 = item;
-            }
-            else  // index == 1 
-            {
-                _item1 = item;
+                _inlineData = MakeInlineAndVersion(1, _inlineData);
+                return;
             }
 
-            _inlineData = MakeInlineAndVersion(2, _inlineData);
+            if (inlineCount == 1)
+            {
+                if (index == 0)
+                {
+                    _item1 = _item0;
+                    _item0 = item;
+                }
+                else // index == 1
+                {
+                    _item1 = item;
+                }
+
+                _inlineData = MakeInlineAndVersion(2, _inlineData);
+                return;
+            }
+
+            switch (index)
+            {
+                case 0:
+                    _item2 = _item1;
+                    _item1 = _item0;
+                    _item0 = item;
+                    break;
+                case 1:
+                    _item2 = _item1;
+                    _item1 = item;
+                    break;
+                case 2:
+                    _item2 = item;
+                    break;
+            }
+
+            _inlineData = MakeInlineAndVersion(3, _inlineData);
             return;
         }
+
         _list ??= new List<T>(4);
 
         switch (index)
         {
             case 0:
-                var oldItem0 = _item0;
-                _list.Insert(0, _item1);
+                _list.Insert(0, _item2);
+                _item2 = _item1;
+                _item1 = _item0;
                 _item0 = item;
-                _item1 = oldItem0;
                 break;
 
             case 1:
-                _list.Insert(0, _item1);
+                _list.Insert(0, _item2);
+                _item2 = _item1;
                 _item1 = item;
                 break;
 
+            case 2:
+                _list.Insert(0, _item2);
+                _item2 = item;
+                break;
+
             default:
-                _list.Insert(index - 2, item);
+                _list.Insert(index - 3, item);
                 break;
         }
 
@@ -249,14 +284,33 @@ public sealed class Inline2List<T> : IList<T>
 
         var comparer = EqualityComparer<T>.Default;
 
-        if (inlineCount >= 1 && comparer.Equals(_item0, item))
+        if (comparer.Equals(_item0, item))
         {
-            if (inlineCount == 2)
+            if (inlineCount == 3)
             {
                 _item0 = _item1;
+                _item1 = _item2;
+
+                if (ListCount > 0)
+                {
+                    _item2 = _list![0];
+                    _list.RemoveAt(0);
+                    _inlineData = IncrementVersion(_inlineData);
+                }
+                else
+                {
+                    _item2 = default!;
+                    _inlineData = MakeInlineAndVersion(2, _inlineData);
+                }
+            }
+            else if (inlineCount == 2)
+            {
+                _item0 = _item1;
+
+                _item1 = default!;
                 _inlineData = MakeInlineAndVersion(1, _inlineData);
             }
-            else
+            else // inlineCount == 1
             {
                 _item0 = default!;
                 _inlineData = MakeInlineAndVersion(0, _inlineData);
@@ -265,20 +319,56 @@ public sealed class Inline2List<T> : IList<T>
             return true;
         }
 
-        if (inlineCount == 2 && comparer.Equals(_item1, item))
+        if (inlineCount >= 2 && comparer.Equals(_item1, item))
+        {
+            if (inlineCount == 3)
+            {
+                if (ListCount > 0)
+                {
+                    _item1 = _item2;
+                    _item2 = _list![0];
+                    _list.RemoveAt(0);
+                    _inlineData = IncrementVersion(_inlineData);
+                }
+                else
+                {
+                    _item1 = _item2;
+                    _item2 = default!;
+                    _inlineData = MakeInlineAndVersion(2, _inlineData);
+                }
+            }
+            else // inlineCount == 2
+            {
+                if (ListCount > 0)
+                {
+                    _item1 = _list![0];
+                    _list.RemoveAt(0);
+                    _inlineData = IncrementVersion(_inlineData);
+                }
+                else
+                {
+                    _item1 = default!;
+                    _inlineData = MakeInlineAndVersion(1, _inlineData);
+                }
+            }
+
+            return true;
+        }
+
+        if (inlineCount == 3 && comparer.Equals(_item2, item))
         {
             if (ListCount > 0)
             {
-                _item1 = _list![0];
+                _item2 = _list![0];
                 _list.RemoveAt(0);
                 _inlineData = IncrementVersion(_inlineData);
             }
             else
             {
-                _item1 = default!;
-                _inlineData = MakeInlineAndVersion(1, _inlineData);
+                _item2 = default!;
+                _inlineData = MakeInlineAndVersion(2, _inlineData);
             }
-            
+
             return true;
         }
 
@@ -298,57 +388,101 @@ public sealed class Inline2List<T> : IList<T>
     /// <param name="index">The zero-based index of the item to remove.</param>
     public void RemoveAt(int index)
     {
-        if ((uint)index >= (uint)Count)
+        var inlineCount = _inlineData & InlineMask;
+        var count = ListCount + inlineCount;
+
+        if ((uint)index >= (uint)count)
         {
             ThrowHelper.ThrowArgumentOutOfRangeException(nameof(index));
         }
 
-        var inlineCount = (byte)(_inlineData & InlineMask);
-
         if (index == 0)
         {
-            if (inlineCount == 2)
+            // Shift left
+            if (inlineCount >= 2)
             {
                 _item0 = _item1;
-                if (ListCount > 0)
-                {
-                    _item1 = _list![0];
-                    _list.RemoveAt(0);
-                    _inlineData = IncrementVersion(_inlineData);
-                }
-                else
-                {
-                    _item1 = default!;
-                    _inlineData = MakeInlineAndVersion(1, _inlineData);
-                }
-            }
-            else    // InlineCount == 1
-            {
-                _item0 = default!;
-                _inlineData = MakeInlineAndVersion(0, _inlineData);
             }
 
-            return;
-        }
-
-        if (index == 1 && inlineCount == 2)
-        {
-            if (ListCount > 0)
+            if (inlineCount >= 3)
             {
-                _item1 = _list![0];
+                _item1 = _item2;
+            }
+
+            if (inlineCount == 3 && ListCount > 0)
+            {
+                _item2 = _list![0];
                 _list.RemoveAt(0);
                 _inlineData = IncrementVersion(_inlineData);
             }
             else
             {
-                _item1 = default!;
-                _inlineData = MakeInlineAndVersion(1, _inlineData);
+                if (inlineCount >= 3)
+                {
+                    _item2 = default!;
+                }
+                else if (inlineCount >= 2)
+                {
+                    _item1 = default!;
+                }
+                else
+                {
+                    _item0 = default!;
+                }
+
+                _inlineData = MakeInlineAndVersion((byte)(inlineCount - 1), _inlineData);
             }
 
             return;
         }
 
-        _list!.RemoveAt(index - 2);
+        if (index == 1 && inlineCount >= 2)
+        {
+            // Shift _item2 => _item1 if needed
+            if (inlineCount == 2)
+            {
+                _item1 = default!;
+                _inlineData = MakeInlineAndVersion(1, _inlineData);
+            }
+            else // inlineCount == 3
+            {
+                if (ListCount > 0)
+                {
+                    _item1 = _item2;
+                    _item2 = _list![0];
+                    _list.RemoveAt(0);
+                    _inlineData = IncrementVersion(_inlineData);
+                }
+                else
+                {
+                    _item1 = _item2;
+                    _item2 = default!;
+                    _inlineData = MakeInlineAndVersion(2, _inlineData);
+                }
+            }
+
+            return;
+        }
+
+        if (index == 2 && inlineCount == 3)
+        {
+            if (ListCount > 0)
+            {
+                _item2 = _list![0];
+                _list.RemoveAt(0);
+                _inlineData = IncrementVersion(_inlineData);
+            }
+            else
+            {
+                _item2 = default!;
+                _inlineData = MakeInlineAndVersion(2, _inlineData);
+            }
+
+            return;
+        }
+
+        // Remove from backing list
+        _list!.RemoveAt(index - 3);
         _inlineData = IncrementVersion(_inlineData);
     }
 
@@ -357,13 +491,9 @@ public sealed class Inline2List<T> : IList<T>
     /// </summary>
     public void Clear()
     {
-        // Reset inline items to default values
-        // This is necessary to avoid memory leaks for reference types.
-        // Pray to the JIT that it will remove these checks for value types.
         if (!typeof(T).IsValueType)
         {
-            _item0 = default!;
-            _item1 = default!;
+            _item0 = _item1 = _item2 = default!;
         }
 
         _inlineData = MakeInlineAndVersion(0, _inlineData);
@@ -401,9 +531,14 @@ public sealed class Inline2List<T> : IList<T>
             return 0;
         }
 
-        if (inlineCount == 2 && comparer.Equals(_item1, item))
+        if (inlineCount >= 2 && comparer.Equals(_item1, item))
         {
             return 1;
+        }
+
+        if (inlineCount == 3 && comparer.Equals(_item2, item))
+        {
+            return 2;
         }
 
         if (_list is null)
@@ -412,7 +547,7 @@ public sealed class Inline2List<T> : IList<T>
         }
 
         var index = _list.IndexOf(item);
-        return index < 0 ? -1 : index + 2;
+        return index < 0 ? -1 : index + 3;
     }
 
     /// <summary>
@@ -439,9 +574,14 @@ public sealed class Inline2List<T> : IList<T>
             array[arrayIndex++] = _item0;
         }
 
-        if (inlineCount == 2)
+        if (inlineCount >= 2)
         {
             array[arrayIndex++] = _item1;
+        }
+
+        if (inlineCount == 3)
+        {
+            array[arrayIndex++] = _item2;
         }
 
         _list?.CopyTo(array, arrayIndex);
@@ -456,7 +596,7 @@ public sealed class Inline2List<T> : IList<T>
     {
         var inlineCount = _inlineData & InlineMask;
 
-        if (destinationIndex < 0 || destinationIndex + inlineCount + ListCount > destination.Length)
+        if (destinationIndex < 0 || destinationIndex + Count > destination.Length)
         {
             ThrowHelper.ThrowArgumentOutOfRangeException(nameof(destinationIndex));
         }
@@ -466,9 +606,14 @@ public sealed class Inline2List<T> : IList<T>
             destination[destinationIndex++] = _item0;
         }
 
-        if (inlineCount == 2)
+        if (inlineCount >= 2)
         {
             destination[destinationIndex++] = _item1;
+        }
+
+        if (inlineCount == 3)
+        {
+            destination[destinationIndex++] = _item2;
         }
 
         if (_list is not null)
@@ -486,9 +631,9 @@ public sealed class Inline2List<T> : IList<T>
     /// <returns>An array containing the elements of the collection.</returns>
     public T[] ToArray()
     {
-        var arr = new T[Count];
-        CopyTo(arr, 0);
-        return arr;
+        var array = new T[Count];
+        CopyTo(array, 0);
+        return array;
     }
 
     /// <summary>
@@ -497,17 +642,22 @@ public sealed class Inline2List<T> : IList<T>
     /// <returns>An <see cref="ImmutableArray{T}"/> containing the elements of the collection.</returns>
     public ImmutableArray<T> ToImmutableArray()
     {
+        var builder = ImmutableArray.CreateBuilder<T>(Count);
         var inlineCount = _inlineData & InlineMask;
-        var builder = ImmutableArray.CreateBuilder<T>(inlineCount + ListCount);
 
         if (inlineCount >= 1)
         {
             builder.Add(_item0);
         }
 
-        if (inlineCount == 2)
+        if (inlineCount >= 2)
         {
             builder.Add(_item1);
+        }
+
+        if (inlineCount == 3)
+        {
+            builder.Add(_item2);
         }
 
         if (_list is not null)
@@ -524,17 +674,22 @@ public sealed class Inline2List<T> : IList<T>
     /// <returns>A list containing the elements of the collection.</returns>
     public List<T> ToList()
     {
+        var result = new List<T>(Count);
         var inlineCount = _inlineData & InlineMask;
-        var result = new List<T>(inlineCount + ListCount);
 
         if (inlineCount >= 1)
         {
             result.Add(_item0);
         }
 
-        if (inlineCount == 2)
+        if (inlineCount >= 2)
         {
             result.Add(_item1);
+        }
+
+        if (inlineCount == 3)
+        {
+            result.Add(_item2);
         }
 
         if (_list is not null)
@@ -555,12 +710,12 @@ public sealed class Inline2List<T> : IList<T>
 
     public struct Enumerator : IEnumerator<T>, IEnumerator
     {
-        private readonly Inline2List<T> _list;
+        private readonly Inline3List<T> _list;
         private int _index;
         private readonly byte _version;
         private T? _current;
 
-        internal Enumerator(Inline2List<T> list)
+        internal Enumerator(Inline3List<T> list)
         {
             _list = list;
             _index = 0;
@@ -573,7 +728,6 @@ public sealed class Inline2List<T> : IList<T>
 
         public readonly void Dispose() { }
 
-        /// <inheritdoc/>
         public bool MoveNext()
         {
             if (_version == _list._inlineData && _index < _list.Count)
@@ -598,10 +752,8 @@ public sealed class Inline2List<T> : IList<T>
             return false;
         }
 
-        /// <inheritdoc/>
         public readonly T Current => _current!;
 
-        /// <inheritdoc/>
         readonly object? IEnumerator.Current
         {
             get
@@ -615,7 +767,6 @@ public sealed class Inline2List<T> : IList<T>
             }
         }
 
-        /// <inheritdoc/>
         void IEnumerator.Reset()
         {
             if (_version != _list._inlineData)
@@ -628,12 +779,12 @@ public sealed class Inline2List<T> : IList<T>
         }
     }
 
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte IncrementVersion(byte data)
     {
         return (byte)(((data + VersionIncrement) & VersionMask) | (data & InlineMask));
     }
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte MakeInlineAndVersion(byte newInlineCount, byte oldData)

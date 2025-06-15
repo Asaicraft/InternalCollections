@@ -563,3 +563,237 @@ public class Inline2ListBenchmark_Remove
         return list.Count;
     }
 }
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline3ListBenchmark_Add
+{
+    [Params(0, 1, 2, 3, 4, 16)]
+    public int Count;
+
+    [Benchmark(Baseline = true)]
+    public int ListAddAndIterate()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var value in list)
+        {
+            sum += value;
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline3ListAddIterate()
+    {
+        var list = new Inline3List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var value in list)
+        {
+            sum += value;
+        }
+
+        return sum;
+    }
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline3ListBenchmark_Insert
+{
+    [Params(0, 1, 2, 3, 4, 16)]
+    public int Count;
+
+    [Benchmark(Baseline = true)]
+    public int ListInsertFront()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Insert(0, i);
+        }
+
+        var sum = 0;
+        foreach (var value in list)
+        {
+            sum += value;
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline3List_InsertFront()
+    {
+        var list = new Inline3List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Insert(0, i);
+        }
+
+        var sum = 0;
+        foreach (var value in list)
+        {
+            sum += value;
+        }
+
+        return sum;
+    }
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline3ListBenchmark_Indexer
+{
+    [Params(1, 2, 3, 4, 16)]
+    public int Count;
+
+    private List<int> _standardList = null!;
+    private Inline3List<int> _inlineThreeList = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _standardList = new List<int>(Count);
+        _inlineThreeList = [];
+
+        for (var i = 0; i < Count; i++)
+        {
+            _standardList.Add(i);
+            _inlineThreeList.Add(i);
+        }
+    }
+
+    [Benchmark(Baseline = true)]
+    public int ListRead()
+    {
+        var sum = 0;
+        for (var i = 0; i < Count; i++)
+        {
+            sum += _standardList[i];
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline3ListRead()
+    {
+        var sum = 0;
+        for (var i = 0; i < Count; i++)
+        {
+            sum += _inlineThreeList[i];
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int ListWrite()
+    {
+        for (var i = 0; i < Count; i++)
+        {
+            _standardList[i] += 1;
+        }
+
+        return _standardList[Count - 1];
+    }
+
+    [Benchmark]
+    public int Inline3ListWrite()
+    {
+        for (var i = 0; i < Count; i++)
+        {
+            _inlineThreeList[i] += 1;
+        }
+
+        return _inlineThreeList[Count - 1];
+    }
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline3ListBenchmarkRemove
+{
+    [Params(0, 1, 2, 3, 4, 16)]
+    public int Count;
+
+    [Benchmark(Baseline = true)]
+    public int ListRemoveByValueSequential()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            list.Remove(i);
+        }
+
+        return list.Count;
+    }
+
+    [Benchmark]
+    public int InlineThreeListRemoveByValueSequential()
+    {
+        var list = new Inline3List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            list.Remove(i);
+        }
+
+        return list.Count;
+    }
+
+    [Benchmark]
+    public int ListRemoveFrontLoop()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        while (list.Count != 0)
+        {
+            list.RemoveAt(0);
+        }
+
+        return list.Count;
+    }
+
+    [Benchmark]
+    public int InlineThreeListRemoveFrontLoop()
+    {
+        var list = new Inline3List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        while (list.Count != 0)
+        {
+            list.RemoveAt(0);
+        }
+
+        return list.Count;
+    }
+}
