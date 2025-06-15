@@ -311,3 +311,179 @@ public class Inline1ListBenchmark
         return sum;
     }
 }
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline2ListBenchmark_Add
+{
+    [Params(0, 1, 2, 3, 16)]
+    public int Count;
+
+    private List<int> _stdList = null!;
+    private Inline2List<int> _inline2 = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _stdList = new List<int>(Count);
+        _inline2 = [];
+
+        for (var i = 0; i < Count; i++)
+        {
+            _stdList.Add(i);
+            _inline2.Add(i);
+        }
+    }
+
+    [Benchmark(Baseline = true)]
+    public int List_AddIterate()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline2List_AddIterate()
+    {
+        var list = new Inline2List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline2ListBenchmark_Insert
+{
+    [Params(0, 1, 2, 3, 16)]
+    public int Count;
+
+    [Benchmark(Baseline = true)]
+    public int List_InsertFront()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Insert(0, i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline2_InsertFront()
+    {
+        var list = new Inline2List<int>();
+        for (var i = 0; i < Count; i++)
+        {
+            list.Insert(0, i);
+        }
+
+        var sum = 0;
+        foreach (var v in list)
+        {
+            sum += v;
+        }
+
+        return sum;
+    }
+}
+
+[MemoryDiagnoser]
+[Config(typeof(ColdVsHotConfig))]
+public class Inline2ListBenchmark_Indexer
+{
+    [Params(1, 2, 3, 16)]
+    public int ElementCount;
+
+    private List<int> _standardList = null!;
+    private Inline2List<int> _inline2List = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _standardList = new List<int>(ElementCount);
+        _inline2List = [];
+
+        for (var index = 0; index < ElementCount; index++)
+        {
+            _standardList.Add(index);
+            _inline2List.Add(index);
+        }
+    }
+
+    [Benchmark(Baseline = true)]
+    public int ListRead()
+    {
+        var sum = 0;
+
+        for (var index = 0; index < ElementCount; index++)
+        {
+            sum += _standardList[index];
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int Inline2Read()
+    {
+        var sum = 0;
+
+        for (var index = 0; index < ElementCount; index++)
+        {
+            sum += _inline2List[index];
+        }
+
+        return sum;
+    }
+
+    [Benchmark]
+    public int ListWrite()
+    {
+        for (var index = 0; index < ElementCount; index++)
+        {
+            _standardList[index] = _standardList[index] + 1;
+        }
+
+        return _standardList[ElementCount - 1];
+    }
+
+    [Benchmark]
+    public int Inline2Write()
+    {
+        for (var index = 0; index < ElementCount; index++)
+        {
+            _inline2List[index] = _inline2List[index] + 1;
+        }
+
+        return _inline2List[ElementCount - 1];
+    }
+}

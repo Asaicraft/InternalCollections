@@ -504,7 +504,7 @@ public sealed class Inline1List<T> : IList<T>
     /// </summary>
     public struct Enumerator : IEnumerator<T>, IEnumerator
     {
-        private Inline1List<T> _list;
+        private readonly Inline1List<T> _list;
         private int _index;
         private readonly byte _version;
         private T? _current;
