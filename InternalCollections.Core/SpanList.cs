@@ -49,7 +49,7 @@ public ref struct SpanList<T>
     /// <summary>
     /// True if the list is in its default state (empty and no backing span).
     /// </summary>
-    public readonly bool IsDefault => _span == default && _count == 0;
+    public readonly bool IsDefault => _span.IsEmpty && _count == 0;
 
     /// <summary>
     /// True if the list is in its default state or empty (no valid elements).

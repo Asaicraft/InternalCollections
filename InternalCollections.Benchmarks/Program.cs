@@ -12,153 +12,325 @@ public class Payload
     public int Value;
 }
 
-[Config(typeof(ColdVsHotConfig))]
+public sealed class DerivedPayload : Payload
+{
+    public int Extra;
+}
+
 [MemoryDiagnoser]
 public class ArrayElementBenchmark
 {
-    [Params(8, 16)]
+    [Params(32, 64, 128)] 
     public int Count;
 
     private Payload[] _plainArray = null!;
     private ArrayElement<Payload>[] _wrappedArray = null!;
+    private DerivedPayload[] _source = null!;
 
     [GlobalSetup]
     public void Setup()
     {
         _plainArray = new Payload[Count];
-        for (var index = 0; index < Count; index++)
-        {
-            _plainArray[index] = new Payload { Value = index };
-        }
-
         _wrappedArray = ArrayElement<Payload>.MakeElementArray(_plainArray)!;
+
+        _source = new DerivedPayload[Count];
+        for (var i = 0; i < Count; i++)
+        {
+            _source[i] = new DerivedPayload { Value = i, Extra = ~i };
+        }
     }
 
     [Benchmark(Baseline = true)]
-    public int SumPlainArray()
+    public void FillPlainArray()
     {
-        var sum = 0;
-        for (var index = 0; index < Count; index++)
+        for (var i = 0; i < Count; i++)
         {
-            sum += _plainArray[index].Value;
+            _plainArray[i] = _source[i];
         }
-
-        return sum;
     }
-
     [Benchmark]
-    public int SumWrappedArray()
+    public void FillWrappedArray()
     {
-        var sum = 0;
-        for (var index = 0; index < Count; index++)
+        for (var i = 0; i < Count; i++)
         {
-            sum += _wrappedArray[index].Value.Value;
+            _wrappedArray[i].Value = _source[i];
         }
-
-        return sum;
     }
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class InvariantArrayBenchmark
 {
-    [Params(8, 16)]
+    [Params(32, 64, 128)]
     public int Count;
 
     private InvariantArray<Payload> _invariantArray = null!;
-    private Payload[] _rawArray = null!;
+    private Payload[] _plainArray = null!;
+    private DerivedPayload[] _source = null!;
 
     [GlobalSetup]
     public void Setup()
     {
         _invariantArray = new InvariantArray<Payload>(Count);
-        _rawArray = new Payload[Count];
+        _plainArray = new Payload[Count];
 
-        for (var index = 0; index < Count; index++)
+        _source = new DerivedPayload[Count];
+        for (var i = 0; i < Count; i++)
         {
-            var payload = new Payload { Value = index };
-            _invariantArray[index] = payload;
-            _rawArray[index] = payload;
+            _source[i] = new DerivedPayload { Value = i, Extra = ~i };
         }
     }
 
     [Benchmark(Baseline = true)]
-    public int ReadRawArray()
+    public void FillPlainArray()
     {
-        var sum = 0;
-        foreach (var element in _rawArray)
+        for (var i = 0; i < Count; i++)
         {
-            sum += element.Value;
+            _plainArray[i] = _source[i];
         }
-
-        return sum;
     }
-
     [Benchmark]
-    public int ReadInvariantArray()
+    public void FillWrappedArray()
     {
-        var sum = 0;
-        foreach (var payload in _invariantArray)
+        for (var i = 0; i < Count; i++)
         {
-            sum += payload.Value;
+            _invariantArray[i] = _source[i];
         }
-
-        return sum;
     }
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class SpanListBenchmark
 {
-    [Params(8, 16)]
+    [Params(8, 16, 256, 1024)]
     public int Count;
 
+    private int[] _randomIndices;
+    private Random _random;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _random = new Random(42);
+        _randomIndices = new int[Count];
+
+        for (var i = 0; i < Count; i++)
+        {
+            _randomIndices[i] = _random.Next(0, i + 1);
+        }
+    }
 
     [Benchmark(Baseline = true)]
-    public int ListAddAndIterate()
-    {
-        var integerList = new List<int>(Count);
+    public int List_AddIterate() => AddIterate_List();
+    [Benchmark]
+    public int Span_AddIterate() => AddIterate_Span();
 
-        integerList.Clear();
-        for (var index = 0; index < Count; index++)
+    [Benchmark]
+    public void List_InsertMiddle() => InsertMiddle_List();
+    [Benchmark]
+    public void Span_InsertMiddle() => InsertMiddle_Span();
+
+    [Benchmark]
+    public void List_RandomRemove() => RandomRemove_List();
+    [Benchmark]
+    public void Span_RandomRemove() => RandomRemove_Span();
+
+    [Benchmark]
+    public void List_RandomInsert() => RandomInsert_List();
+    [Benchmark]
+    public void Span_RandomInsert() => RandomInsert_Span();
+
+    [Benchmark]
+    public void List_Contains() => Contains_List();
+    [Benchmark]
+    public void Span_Contains() => Contains_Span();
+
+    [Benchmark]
+    public void List_IndexOf() => IndexOf_List();
+    [Benchmark]
+    public void Span_IndexOf() => IndexOf_Span();
+
+    [Benchmark]
+    public void List_ConcurrentAddIterate() => ConcurrentAdd_List();
+    [Benchmark]
+    public void Span_ConcurrentAddIterate() => ConcurrentAdd_Span();
+
+    private int AddIterate_List()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
         {
-            integerList.Add(index);
+            list.Add(i);
         }
 
         var sum = 0;
-        foreach (var value in integerList)
+        foreach (var v in list)
         {
-            sum += value;
+            sum += v;
         }
 
         return sum;
     }
 
-    [Benchmark]
-    public int SpanListAddAndIterate()
+    private int AddIterate_Span()
     {
         Span<int> buffer = stackalloc int[Count];
-        var spanList = new SpanList<int>(buffer.Slice(0, Count));
-
-        for (var index = 0; index < Count; index++)
+        var spanList = new SpanList<int>(buffer);
+        for (var i = 0; i < Count; i++)
         {
-            spanList.Add(index);
+            spanList.Add(i);
         }
 
         var sum = 0;
-        foreach (ref readonly var value in spanList)
+        foreach (ref readonly var v in spanList)
         {
-            sum += value;
+            sum += v;
         }
 
         return sum;
+    }
+
+    private void InsertMiddle_List()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Insert(list.Count / 2, i);
+        }
+    }
+
+    private void InsertMiddle_Span()
+    {
+        Span<int> buf = stackalloc int[Count];
+        var spanList = new SpanList<int>(buf);
+        for (var i = 0; i < Count; i++)
+        {
+            spanList.Insert(spanList.Count / 2, i);
+        }
+    }
+
+    private void RandomRemove_List()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            var index = _randomIndices[i] % list.Count;
+            list.RemoveAt(index);
+        }
+    }
+
+    private void RandomRemove_Span()
+    {
+        Span<int> buffer = stackalloc int[Count];
+        var spanList = new SpanList<int>(buffer);
+        for (var i = 0; i < Count; i++)
+        {
+            spanList.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            var index = _randomIndices[i] % spanList.Count;
+            spanList.RemoveAt(index);
+        }
+    }
+
+    private void RandomInsert_List()
+    {
+        var list = new List<int>(Count);
+
+        for (var i = 0; i < Count; i++)
+        {
+            var index = _randomIndices[i] % (list.Count + 1);
+            list.Insert(index, i);
+        }
+    }
+
+    private void RandomInsert_Span()
+    {
+        Span<int> buf = stackalloc int[Count];
+        var spanList = new SpanList<int>(buf);
+        for (var i = 0; i < Count; i++)
+        {
+            var index = _randomIndices[i] % (spanList.Count + 1);
+            spanList.Insert(index, i);
+        }
+    }
+
+    private void Contains_List()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+        for (var i = 0; i < Count; i++)
+        {
+            _ = list.Contains(_randomIndices[i] % Count);
+        }
+    }
+
+    private void Contains_Span()
+    {
+        Span<int> buffer = stackalloc int[Count];
+        var spanList = new SpanList<int>(buffer);
+        for (var i = 0; i < Count; i++)
+        {
+            spanList.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            _ = spanList.Contains(_randomIndices[i] % Count);
+        }
+    }
+
+    private void IndexOf_List()
+    {
+        var list = new List<int>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            list.Add(i);
+        }
+
+        for (var i = 0; i < Count; i++)
+        {
+            _ = list.IndexOf(_randomIndices[i] % Count);
+        }
+    }
+
+    private void IndexOf_Span()
+    {
+        Span<int> buf = stackalloc int[Count];
+        var spanList = new SpanList<int>(buf);
+        for (var i = 0; i < Count; i++)
+        {
+            spanList.Add(i);
+        }
+        for (var i = 0; i < Count; i++)
+        {
+            _ = spanList.IndexOf(_randomIndices[i] % Count);
+        }
+    }
+
+    private void ConcurrentAdd_List()
+    {
+        Parallel.For(0, Environment.ProcessorCount, _ => AddIterate_List());
+    }
+
+    private void ConcurrentAdd_Span()
+    {
+        Parallel.For(0, Environment.ProcessorCount, _ => AddIterate_Span());
     }
 }
 
+
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class TinyDictionaryBenchmark
 {
     [Params(8, 16)]
@@ -205,7 +377,6 @@ public class TinyDictionaryBenchmark
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class RefSpanBenchmark
 {
     [Params(4, 8, 256)]
@@ -253,7 +424,6 @@ public class RefSpanBenchmark
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline1ListBenchmark
 {
     [Params(0, 1, 2, 16)]
@@ -313,7 +483,6 @@ public class Inline1ListBenchmark
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline2ListBenchmark_Add
 {
     [Params(0, 1, 2, 3, 16)]
@@ -373,7 +542,6 @@ public class Inline2ListBenchmark_Add
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline2ListBenchmark_Insert
 {
     [Params(0, 1, 2, 3, 16)]
@@ -417,7 +585,6 @@ public class Inline2ListBenchmark_Insert
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline2ListBenchmark_Indexer
 {
     [Params(1, 2, 3, 16)]
@@ -489,7 +656,6 @@ public class Inline2ListBenchmark_Indexer
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline2ListBenchmark_Remove
 {
     [Params(0, 1, 2, 3, 16)]
@@ -565,7 +731,6 @@ public class Inline2ListBenchmark_Remove
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline3ListBenchmark_Add
 {
     [Params(0, 1, 2, 3, 4, 16)]
@@ -609,7 +774,6 @@ public class Inline3ListBenchmark_Add
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline3ListBenchmark_Insert
 {
     [Params(0, 1, 2, 3, 4, 16)]
@@ -653,7 +817,6 @@ public class Inline3ListBenchmark_Insert
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline3ListBenchmark_Indexer
 {
     [Params(1, 2, 3, 4, 16)]
@@ -723,7 +886,6 @@ public class Inline3ListBenchmark_Indexer
 }
 
 [MemoryDiagnoser]
-[Config(typeof(ColdVsHotConfig))]
 public class Inline3ListBenchmarkRemove
 {
     [Params(0, 1, 2, 3, 4, 16)]
