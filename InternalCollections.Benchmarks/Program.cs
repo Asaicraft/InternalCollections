@@ -1,10 +1,12 @@
-﻿using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Analysers;
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
 using InternalCollections;
 using InternalCollections.Benchmarks;
 using System.Runtime.InteropServices;
 
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly)
+var result = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly)
                  .Run(args);
 
 public class Payload
